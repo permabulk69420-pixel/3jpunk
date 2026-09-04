@@ -301,7 +301,9 @@ function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
   sprite.position.set(x - side * 1.58, 4.83, z);
   sprite.scale.set(2.1, 2.1, 1);
   root.add(sprite);
-  const hasRealLight = isQuest ? [1, 4].includes(index) : index % 2 === 0;
+  // Quest keeps the visible emissive bulb and halo, but avoids dynamic point-light
+  // specular streaks that make ordinary wet surfaces read as self-illuminated.
+  const hasRealLight = !isQuest && index % 2 === 0;
   if (hasRealLight) {
     const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 14 : 20, 9.5, 2.2);
     light.position.copy(sprite.position);
