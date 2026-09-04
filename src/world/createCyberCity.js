@@ -1,528 +1,593 @@
 import * as THREE from 'three';
 import { BuildingFactory } from './BuildingFactory.js';
-import { BUILDING_SLOTS, CITY_BOUNDS, SIGN_COPY } from './cityData.js';
+import { BUILDING_SLOTS, CITY_BOUNDS, STREET_SIGNS } from './cityData.js';
 import { CityAssetRegistry } from './CityAssetRegistry.js';
-import {
-  createAsphaltTextures,
-  createConcreteTexture,
-  createRadialTexture,
-  createReflectionStreakTexture,
-  createSignTexture,
-  seededRandom,
-} from './proceduralTextures.js';
+import { createMaterialLibrary } from './materialLibrary.js';
+import { createRadialTexture, seededRandom } from './proceduralTextures.js';
 
-function makeBox(parent, geometry, material, position, scale = [1, 1, 1], name = '') {
-  const mesh = new THREE.Mesh(geometry, material);
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+const UNIT_CYLINDER_8 = new THREE.CylinderGeometry(1, 1, 1, 8);
+const UNIT_CYLINDER_16 = new THREE.CylinderGeometry(1, 1, 1, 16);
+const UNIT_CYLINDER_32 = new THREE.CylinderGeometry(1, 1, 1, 32);
+
+function addBox(parent, material, size, position, options = {}) {
+  const mesh = new THREE.Mesh(UNIT_BOX, material);
   mesh.position.set(...position);
+  mesh.scale.set(...size);
+  if (options.rotation) mesh.rotation.set(...options.rotation);
+  mesh.castShadow = options.castShadow ?? false;
+  mesh.receiveShadow = options.receiveShadow ?? true;
+  if (options.name) mesh.name = options.name;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addCylinder(parent, geometry, material, scale, position, rotation = null) {
+  const mesh = new THREE.Mesh(geometry, material);
   mesh.scale.set(...scale);
-  mesh.name = name;
+  mesh.position.set(...position);
+  if (rotation) mesh.rotation.set(...rotation);
   mesh.receiveShadow = true;
   parent.add(mesh);
   return mesh;
 }
 
-function makeCylinder(parent, geometry, material, position, rotation = null) {
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(...position);
-  if (rotation) mesh.rotation.set(...rotation);
-  parent.add(mesh);
-  return mesh;
+function createWayfindingTexture(sign) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 256;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#111615';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = '#d5c9ad';
+  context.fillRect(18, 18, 988, 220);
+  context.fillStyle = '#202724';
+  context.fillRect(27, 27, 970, 202);
+  context.fillStyle = '#d3ccbb';
+  context.font = '900 88px Arial Narrow, Arial, sans-serif';
+  context.fillText(sign.title, 58, 116);
+  context.fillStyle = '#c86b4c';
+  context.font = '700 25px monospace';
+  context.fillText(sign.subtitle, 62, 191);
+  context.textAlign = 'right';
+  context.fillStyle = '#8db0aa';
+  context.font = '700 58px sans-serif';
+  context.fillText(sign.local, 956, 145);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createReflectionTexture(color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 1024;
+  const context = canvas.getContext('2d');
+  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, 'rgba(0,0,0,0)');
+  gradient.addColorStop(0.18, color);
+  gradient.addColorStop(0.47, `${color}7a`);
+  gradient.addColorStop(0.72, `${color}20`);
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const random = seededRandom(parseInt(color.slice(1), 16));
+  context.globalCompositeOperation = 'destination-out';
+  for (let index = 0; index < 90; index += 1) {
+    context.globalAlpha = 0.15 + random() * 0.58;
+    context.fillRect(random() * 256, random() * 1024, 2 + random() * 22, 1 + random() * 8);
+  }
+  context.globalCompositeOperation = 'source-over';
+  context.globalAlpha = 1;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
 }
 
 function addSky(scene) {
-  const geometry = new THREE.SphereGeometry(260, 32, 16);
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     uniforms: {
-      topColor: { value: new THREE.Color(0x01030a) },
-      horizonColor: { value: new THREE.Color(0x16243e) },
-      groundColor: { value: new THREE.Color(0x02030a) },
+      zenith: { value: new THREE.Color(0x020407) },
+      horizon: { value: new THREE.Color(0x192428) },
+      lower: { value: new THREE.Color(0x060708) },
     },
     vertexShader: `
-      varying vec3 vWorldPosition;
+      varying vec3 vWorld;
       void main() {
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
+        vec4 world = modelMatrix * vec4(position, 1.0);
+        vWorld = world.xyz;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
-      varying vec3 vWorldPosition;
-      uniform vec3 topColor;
-      uniform vec3 horizonColor;
-      uniform vec3 groundColor;
+      varying vec3 vWorld;
+      uniform vec3 zenith;
+      uniform vec3 horizon;
+      uniform vec3 lower;
       void main() {
-        float h = normalize(vWorldPosition).y;
-        vec3 lower = mix(groundColor, horizonColor, smoothstep(-0.2, 0.08, h));
-        vec3 color = mix(lower, topColor, smoothstep(0.05, 0.72, h));
+        float height = normalize(vWorld).y;
+        vec3 color = mix(lower, horizon, smoothstep(-0.2, 0.08, height));
+        color = mix(color, zenith, smoothstep(0.08, 0.74, height));
         gl_FragColor = vec4(color, 1.0);
       }
     `,
   });
-  const sky = new THREE.Mesh(geometry, material);
-  sky.name = 'NIGHT_SKY';
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), material);
+  sky.name = 'RAIN_CLOUD_SKY';
   scene.add(sky);
 
-  const hazeTexture = createRadialTexture([
-    [0, 'rgba(130,180,255,.76)'],
-    [0.08, 'rgba(96,145,255,.34)'],
-    [0.38, 'rgba(33,67,127,.12)'],
+  const glowTexture = createRadialTexture([
+    [0, 'rgba(212,228,222,.72)'],
+    [0.06, 'rgba(195,214,216,.42)'],
+    [0.35, 'rgba(116,143,151,.08)'],
     [1, 'rgba(0,0,0,0)'],
   ]);
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: hazeTexture,
-    color: 0x7699ff,
+    map: glowTexture,
+    color: 0xb9c9c6,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.24,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
   }));
-  glow.position.set(-74, 58, -145);
-  glow.scale.set(74, 74, 1);
+  glow.position.set(-82, 67, -170);
+  glow.scale.set(72, 72, 1);
   scene.add(glow);
 }
 
-function addLighting(scene) {
-  const hemisphere = new THREE.HemisphereLight(0x557da8, 0x160817, 0.82);
-  hemisphere.name = 'CITY_AMBIENT';
+function addLighting(scene, isQuest) {
+  const hemisphere = new THREE.HemisphereLight(0x869ca5, 0x17110f, 0.64);
+  hemisphere.name = 'OVERCAST_AMBIENT';
   scene.add(hemisphere);
 
-  const moon = new THREE.DirectionalLight(0x8aa9ff, 1.65);
-  moon.position.set(-28, 58, 30);
-  moon.target.position.set(0, 0, -18);
-  moon.name = 'MOON_KEY';
+  const moon = new THREE.DirectionalLight(0xa8c1c6, 2.15);
+  moon.name = 'MOON_THROUGH_CLOUD';
+  moon.position.set(-32, 62, 36);
+  moon.target.position.set(0, 5, -18);
+  moon.castShadow = true;
+  moon.shadow.mapSize.set(isQuest ? 1024 : 2048, isQuest ? 1024 : 2048);
+  moon.shadow.camera.left = -38;
+  moon.shadow.camera.right = 38;
+  moon.shadow.camera.top = 50;
+  moon.shadow.camera.bottom = -22;
+  moon.shadow.camera.near = 5;
+  moon.shadow.camera.far = 145;
+  moon.shadow.bias = -0.0008;
+  moon.shadow.normalBias = 0.025;
   scene.add(moon, moon.target);
 
-  const alleyFill = new THREE.DirectionalLight(0xff3a9b, 0.32);
-  alleyFill.position.set(22, 16, -8);
-  alleyFill.target.position.set(0, 4, 12);
-  scene.add(alleyFill, alleyFill.target);
+  const distantWarmth = new THREE.DirectionalLight(0xd17754, 0.24);
+  distantWarmth.position.set(18, 12, -60);
+  distantWarmth.target.position.set(0, 4, 18);
+  scene.add(distantWarmth, distantWarmth.target);
 }
 
-function addStreetSurface(root, renderer) {
-  const maxAnisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const { map: asphaltMap, bumpMap } = createAsphaltTextures();
-  asphaltMap.anisotropy = maxAnisotropy;
-  bumpMap.anisotropy = maxAnisotropy;
-  const asphalt = new THREE.MeshPhysicalMaterial({
-    color: 0x111925,
-    map: asphaltMap,
-    bumpMap,
-    bumpScale: 0.075,
-    roughness: 0.29,
-    metalness: 0.66,
-    clearcoat: 1,
-    clearcoatRoughness: 0.17,
-    envMapIntensity: 1.7,
-  });
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(15.4, 104), asphalt);
+function addRoad(root, materials) {
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(13.3, 116), materials.road);
   road.name = 'WET_ASPHALT';
   road.rotation.x = -Math.PI / 2;
   road.position.y = 0;
   road.receiveShadow = true;
   root.add(road);
 
-  const concreteMap = createConcreteTexture(9401, '#303743');
-  concreteMap.repeat.set(4, 20);
-  concreteMap.anisotropy = maxAnisotropy;
-  const sidewalkMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x353c48,
-    map: concreteMap,
-    roughness: 0.52,
-    metalness: 0.28,
-    clearcoat: 0.72,
-    clearcoatRoughness: 0.28,
-    envMapIntensity: 1.2,
+  const sidewalkGeometry = new THREE.BoxGeometry(4.32, 0.24, 116);
+  for (const x of [-8.88, 8.88]) {
+    const sidewalk = new THREE.Mesh(sidewalkGeometry, materials.sidewalk);
+    sidewalk.position.set(x, 0.08, 0);
+    sidewalk.receiveShadow = true;
+    root.add(sidewalk);
+  }
+  addBox(root, materials.curb, [0.28, 0.34, 116], [-6.72, 0.11, 0]);
+  addBox(root, materials.curb, [0.28, 0.34, 116], [6.72, 0.11, 0]);
+
+  const gutterMaterial = materials.road.clone();
+  gutterMaterial.color.multiplyScalar(0.52);
+  gutterMaterial.roughness = 0.18;
+  for (const x of [-6.43, 6.43]) {
+    const gutter = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 114), gutterMaterial);
+    gutter.rotation.x = -Math.PI / 2;
+    gutter.position.set(x, 0.018, 0);
+    root.add(gutter);
+  }
+
+  const markingMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb5aa83,
+    roughness: 0.57,
+    metalness: 0.02,
+    transparent: true,
+    opacity: 0.36,
   });
-  const sidewalkGeometry = new THREE.BoxGeometry(3.8, 0.24, 104);
-  makeBox(root, sidewalkGeometry, sidewalkMaterial, [-9.6, 0.06, 0]);
-  makeBox(root, sidewalkGeometry, sidewalkMaterial, [9.6, 0.06, 0]);
+  for (let z = -47; z <= 47; z += 8.4) {
+    const marking = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 3.2), markingMaterial);
+    marking.rotation.x = -Math.PI / 2;
+    marking.position.set(0, 0.034, z);
+    root.add(marking);
+  }
+  const edgeMarking = markingMaterial.clone();
+  edgeMarking.color.set(0x92958c);
+  edgeMarking.opacity = 0.22;
+  for (const x of [-5.55, 5.55]) {
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.075, 108), edgeMarking);
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(x, 0.033, -2);
+    root.add(line);
+  }
 
-  const curbMaterial = new THREE.MeshStandardMaterial({ color: 0x4a535e, roughness: 0.48, metalness: 0.38 });
-  const curbGeometry = new THREE.BoxGeometry(0.28, 0.34, 104);
-  makeBox(root, curbGeometry, curbMaterial, [-7.83, 0.11, 0]);
-  makeBox(root, curbGeometry, curbMaterial, [7.83, 0.11, 0]);
-
-  const reflectionTexture = createReflectionStreakTexture();
-  const reflections = new THREE.Mesh(
-    new THREE.PlaneGeometry(13.7, 94),
-    new THREE.MeshBasicMaterial({
-      map: reflectionTexture,
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.42,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      toneMapped: false,
-    }),
-  );
-  reflections.name = 'NEON_ROAD_REFLECTIONS';
-  reflections.rotation.x = -Math.PI / 2;
-  reflections.position.y = 0.025;
-  root.add(reflections);
-
-  const stripeMaterial = new THREE.MeshBasicMaterial({ color: 0xd7c97c, transparent: true, opacity: 0.37 });
-  const stripeGeometry = new THREE.PlaneGeometry(0.09, 2.9);
-  for (let z = -44; z <= 44; z += 6.3) {
-    const stripe = new THREE.Mesh(stripeGeometry, stripeMaterial);
+  const crossingMaterial = markingMaterial.clone();
+  crossingMaterial.color.set(0xb9b7aa);
+  crossingMaterial.opacity = 0.31;
+  for (let x = -5.7; x <= 5.7; x += 1.38) {
+    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 3.05), crossingMaterial);
     stripe.rotation.x = -Math.PI / 2;
-    stripe.position.set(0, 0.036, z);
+    stripe.position.set(x, 0.036, 46.5);
     root.add(stripe);
   }
 
-  const edgeLineMaterial = new THREE.MeshBasicMaterial({ color: 0x71818d, transparent: true, opacity: 0.28 });
-  for (const x of [-6.9, 6.9]) {
-    const edge = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 99), edgeLineMaterial);
-    edge.rotation.x = -Math.PI / 2;
-    edge.position.set(x, 0.034, 0);
-    root.add(edge);
+  const patchMaterial = materials.road.clone();
+  patchMaterial.color.set(0x4b4e4d);
+  patchMaterial.roughness = 0.48;
+  const random = seededRandom(21903);
+  for (let index = 0; index < 13; index += 1) {
+    const patch = new THREE.Mesh(new THREE.CircleGeometry(1, 14), patchMaterial);
+    patch.rotation.x = -Math.PI / 2;
+    patch.rotation.z = random() * Math.PI;
+    patch.scale.set(0.45 + random() * 1.25, 0.16 + random() * 0.48, 1);
+    patch.position.set((random() - 0.5) * 9.8, 0.028, -50 + random() * 100);
+    root.add(patch);
   }
 
-  const crosswalkMaterial = new THREE.MeshBasicMaterial({ color: 0xb7c7ca, transparent: true, opacity: 0.44 });
-  for (let x = -6.4; x <= 6.4; x += 1.5) {
-    const marking = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 3.7), crosswalkMaterial);
-    marking.rotation.x = -Math.PI / 2;
-    marking.position.set(x, 0.037, 35.5);
-    root.add(marking);
+  const crackMaterial = new THREE.LineBasicMaterial({ color: 0x151817, transparent: true, opacity: 0.58 });
+  for (let index = 0; index < 9; index += 1) {
+    const startX = (random() - 0.5) * 10;
+    const startZ = -48 + random() * 96;
+    const points = [];
+    for (let step = 0; step < 7; step += 1) {
+      points.push(new THREE.Vector3(startX + (random() - 0.5) * 0.7 + step * 0.11, 0.042, startZ + step * 0.42));
+    }
+    root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), crackMaterial));
   }
 
   const puddleMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x101c28,
-    transparent: true,
-    opacity: 0.62,
-    roughness: 0.06,
-    metalness: 0.86,
+    color: 0x263134,
+    roughness: 0.04,
+    metalness: 0.06,
     clearcoat: 1,
-    clearcoatRoughness: 0.03,
-    envMapIntensity: 2.7,
+    clearcoatRoughness: 0.018,
+    transparent: true,
+    opacity: 0.58,
+    envMapIntensity: 2.4,
+    depthWrite: false,
   });
-  const puddleGeometry = new THREE.CircleGeometry(1, 22);
-  const random = seededRandom(7288);
-  for (let index = 0; index < 17; index += 1) {
-    const puddle = new THREE.Mesh(puddleGeometry, puddleMaterial);
+  for (let index = 0; index < 22; index += 1) {
+    const puddle = new THREE.Mesh(new THREE.CircleGeometry(1, 24), puddleMaterial);
     puddle.rotation.x = -Math.PI / 2;
     puddle.rotation.z = random() * Math.PI;
-    puddle.scale.set(0.55 + random() * 2.2, 0.35 + random() * 0.85, 1);
-    puddle.position.set((random() - 0.5) * 13.2, 0.043, -43 + random() * 86);
+    puddle.scale.set(0.35 + random() * 1.7, 0.15 + random() * 0.52, 1);
+    puddle.position.set((random() - 0.5) * 11.7, 0.052, -50 + random() * 100);
     root.add(puddle);
   }
 
-  const grateMaterial = new THREE.MeshStandardMaterial({ color: 0x090d12, roughness: 0.32, metalness: 0.94 });
-  const grateGeometry = new THREE.BoxGeometry(0.72, 0.045, 1.2);
-  for (const x of [-7.45, 7.45]) {
-    for (let z = -42; z <= 42; z += 12) {
-      const grate = makeBox(root, grateGeometry, grateMaterial, [x, 0.055, z]);
-      for (let line = -0.42; line <= 0.42; line += 0.21) {
-        makeBox(grate, new THREE.BoxGeometry(0.76, 0.02, 0.035), new THREE.MeshBasicMaterial({ color: 0x44515b }), [0, 0.035, line]);
+  const reflectionData = [
+    [-3.7, 30, '#d76c47', 1.4, 11],
+    [4.2, 18, '#4baaa8', 1.1, 9],
+    [-4.6, -10, '#b94867', 1.25, 10],
+    [3.8, -26, '#5d9da9', 1.05, 12],
+    [-2.2, -40, '#cf8b55', 0.8, 7],
+  ];
+  reflectionData.forEach(([x, z, color, width, length]) => {
+    const texture = createReflectionTexture(color);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.16,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const reflection = new THREE.Mesh(new THREE.PlaneGeometry(width, length), material);
+    reflection.rotation.x = -Math.PI / 2;
+    reflection.position.set(x, 0.057, z);
+    root.add(reflection);
+  });
+}
+
+function addRoadHardware(root, materials) {
+  const manholeMaterial = materials.metal.clone();
+  manholeMaterial.color.set(0x252b2a);
+  manholeMaterial.roughness = 0.43;
+  const positions = [[-2.6, 31], [2.8, 2], [-2.2, -29]];
+  positions.forEach(([x, z], index) => {
+    addCylinder(root, UNIT_CYLINDER_32, manholeMaterial, [0.68, 0.06, 0.68], [x, 0.055, z]);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.045, 7, 28), materials.blackMetal);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(x, 0.096, z);
+    root.add(ring);
+    for (let line = -0.3; line <= 0.3; line += 0.2) {
+      addBox(root, materials.blackMetal, [0.58, 0.035, 0.04], [x, 0.098, z + line], { rotation: [0, index * 0.35, 0] });
+    }
+  });
+
+  for (const side of [-1, 1]) {
+    for (let z = -48; z <= 48; z += 9.6) {
+      addBox(root, materials.blackMetal, [0.62, 0.045, 1.05], [side * 6.46, 0.06, z]);
+      for (let offset = -0.4; offset <= 0.4; offset += 0.16) {
+        addBox(root, materials.metal, [0.5, 0.026, 0.028], [side * 6.46, 0.09, z + offset]);
       }
     }
   }
 }
 
-function addStreetFurniture(root, scene, isQuest) {
-  const metal = new THREE.MeshStandardMaterial({ color: 0x121b25, roughness: 0.32, metalness: 0.88 });
-  const black = new THREE.MeshStandardMaterial({ color: 0x04070c, roughness: 0.46, metalness: 0.74 });
-  const poleGeometry = new THREE.CylinderGeometry(0.08, 0.12, 5.5, 8);
-  const armGeometry = new THREE.BoxGeometry(1.3, 0.09, 0.09);
-  const lampGeometry = new THREE.BoxGeometry(0.58, 0.16, 0.25);
-  const glows = [0x54ebff, 0xff398e];
-  const radial = createRadialTexture([
-    [0, 'rgba(255,255,255,1)'],
-    [0.07, 'rgba(255,255,255,.94)'],
-    [0.25, 'rgba(100,230,255,.35)'],
-    [1, 'rgba(0,0,0,0)'],
-  ]);
-  const lampPositions = [-39, -24, -7, 10, 27, 43];
-  lampPositions.forEach((z, index) => {
-    for (const side of [-1, 1]) {
-      const x = side * 9.15;
-      makeCylinder(root, poleGeometry, metal, [x, 2.75, z]);
-      const arm = makeBox(root, armGeometry, metal, [x - side * 0.58, 5.38, z]);
-      arm.rotation.z = side * -0.07;
-      const color = glows[(index + (side > 0 ? 1 : 0)) % 2];
-      const lampMaterial = new THREE.MeshBasicMaterial({ color, toneMapped: false });
-      makeBox(root, lampGeometry, lampMaterial, [x - side * 1.16, 5.27, z]);
-      const spriteMaterial = new THREE.SpriteMaterial({
-        map: radial,
-        color,
-        transparent: true,
-        opacity: 0.56,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        toneMapped: false,
-      });
-      const sprite = new THREE.Sprite(spriteMaterial);
-      sprite.position.set(x - side * 1.16, 5.22, z);
-      sprite.scale.set(2.2, 2.2, 1);
-      root.add(sprite);
-      if (!isQuest && index % 2 === 0) {
-        const light = new THREE.PointLight(color, 16, 10, 2);
-        light.position.copy(sprite.position);
-        scene.add(light);
-      }
-    }
+function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
+  const x = side * 9.45;
+  addCylinder(root, UNIT_CYLINDER_8, materials.blackMetal, [0.11, 5.35, 0.11], [x, 2.72, z]);
+  addBox(root, materials.metal, [1.65, 0.1, 0.11], [x - side * 0.76, 5.22, z], { rotation: [0, 0, side * -0.08] });
+  addBox(root, materials.blackMetal, [0.78, 0.24, 0.42], [x - side * 1.58, 5.06, z], { castShadow: true });
+  const lampColor = index % 4 === 3 ? 0xa8d0cb : 0xffb16e;
+  const emissive = new THREE.MeshStandardMaterial({
+    color: lampColor,
+    emissive: lampColor,
+    emissiveIntensity: 2.2,
+    roughness: 0.32,
   });
-
-  const bollardGeometry = new THREE.CylinderGeometry(0.1, 0.14, 0.85, 8);
-  const bollardMaterial = new THREE.MeshStandardMaterial({ color: 0x252f37, roughness: 0.34, metalness: 0.86 });
-  const glowMaterial = new THREE.MeshBasicMaterial({ color: 0x55eaff, toneMapped: false });
-  for (const side of [-1, 1]) {
-    for (let z = -44; z <= 44; z += 7.5) {
-      makeCylinder(root, bollardGeometry, bollardMaterial, [side * 7.95, 0.48, z]);
-      makeCylinder(root, new THREE.CylinderGeometry(0.145, 0.145, 0.035, 8), glowMaterial, [side * 7.95, 0.77, z]);
-    }
-  }
-
-  const benchPositions = [
-    [-9.5, 0.7, 15, 0],
-    [9.5, 0.7, -20, Math.PI],
-  ];
-  benchPositions.forEach(([x, y, z, rotation]) => {
-    const bench = new THREE.Group();
-    bench.position.set(x, y, z);
-    bench.rotation.y = rotation;
-    makeBox(bench, new THREE.BoxGeometry(0.8, 0.12, 2.8), metal, [0, 0, 0]);
-    makeBox(bench, new THREE.BoxGeometry(0.12, 1.05, 2.8), black, [0.38, 0.47, 0]);
-    for (const offset of [-0.9, 0.9]) makeBox(bench, new THREE.BoxGeometry(0.12, 0.72, 0.12), metal, [0, -0.36, offset]);
-    root.add(bench);
-  });
-}
-
-function addVendingMachine(root, renderer, side, z, accent, label) {
-  const group = new THREE.Group();
-  group.name = `VENDING__${label}`;
-  group.position.set(side * 10.6, 1.25, z);
-  group.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
-  const body = new THREE.MeshStandardMaterial({ color: 0x131925, roughness: 0.32, metalness: 0.82 });
-  const black = new THREE.MeshStandardMaterial({ color: 0x020408, roughness: 0.3, metalness: 0.8 });
-  makeBox(group, new THREE.BoxGeometry(1.15, 2.5, 0.78), body, [0, 0, 0]);
-  const texture = createSignTexture({
-    title: label,
-    subtitle: 'SYNTHETIC REFRESHMENT',
-    glyph: '冷',
-    accent: `#${new THREE.Color(accent).getHexString()}`,
-    accent2: '#ffffff',
-    seed: label.length * 81,
-  });
-  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const panel = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.88, 1.15),
-    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }),
-  );
-  panel.position.set(0, 0.38, 0.401);
-  group.add(panel);
-  makeBox(group, new THREE.BoxGeometry(0.77, 0.31, 0.08), black, [0, -0.76, 0.43]);
-  const light = new THREE.PointLight(accent, 4.5, 4.5, 2);
-  light.position.set(0, 0.5, 1);
-  group.add(light);
-  root.add(group);
-}
-
-function addSkybridge(root, animated) {
-  const bridge = new THREE.Group();
-  bridge.name = 'SKYBRIDGE_01';
-  bridge.position.set(0, 14.2, -11.5);
-  const frame = new THREE.MeshStandardMaterial({ color: 0x111a25, roughness: 0.24, metalness: 0.92 });
-  const glass = new THREE.MeshPhysicalMaterial({
-    color: 0x0f2c38,
+  addBox(root, emissive, [0.56, 0.055, 0.27], [x - side * 1.58, 4.91, z]);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture,
+    color: lampColor,
     transparent: true,
-    opacity: 0.42,
-    transmission: 0.18,
-    roughness: 0.09,
-    metalness: 0.3,
-    clearcoat: 1,
-    side: THREE.DoubleSide,
-  });
-  const cyan = new THREE.MeshBasicMaterial({ color: 0x54efff, toneMapped: false, transparent: true, opacity: 0.9 });
-  makeBox(bridge, new THREE.BoxGeometry(23.4, 0.35, 3.15), frame, [0, -1.5, 0]);
-  makeBox(bridge, new THREE.BoxGeometry(23.4, 0.28, 3.15), frame, [0, 1.55, 0]);
-  for (const z of [-1.5, 1.5]) {
-    makeBox(bridge, new THREE.BoxGeometry(22.8, 2.8, 0.08), glass, [0, 0, z]);
-    makeBox(bridge, new THREE.BoxGeometry(23.2, 0.08, 0.08), cyan, [0, -1.28, z + Math.sign(z) * 0.05]);
-  }
-  for (let x = -11; x <= 11; x += 2.2) {
-    for (const z of [-1.58, 1.58]) makeBox(bridge, new THREE.BoxGeometry(0.09, 3.05, 0.12), frame, [x, 0, z]);
-  }
-  root.add(bridge);
-  animated.push((elapsed) => {
-    cyan.opacity = 0.72 + Math.sin(elapsed * 2.1) * 0.12;
-  });
-}
-
-function addOverheadCables(root) {
-  const cableMaterial = new THREE.MeshStandardMaterial({ color: 0x070a0e, roughness: 0.4, metalness: 0.88 });
-  const accents = [
-    [[-11, 18, 28], [0, 15.2, 25], [11, 19, 22]],
-    [[-11, 25, -2], [0, 20.4, 1], [11, 24, 4]],
-    [[-11, 31, -34], [0, 27.5, -30], [11, 29, -27]],
-  ];
-  accents.forEach((points, index) => {
-    const curve = new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(...point)));
-    const cable = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 0.045 + index * 0.012, 5, false), cableMaterial);
-    root.add(cable);
-  });
-
-  for (const side of [-1, 1]) {
-    const x = side * 11.15;
-    const curve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(x, 10, -49),
-      new THREE.Vector3(x + side * 0.8, 8.6, -20),
-      new THREE.Vector3(x - side * 0.3, 9.2, 12),
-      new THREE.Vector3(x, 10.5, 49),
-    ]);
-    root.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 64, 0.035, 5, false), cableMaterial));
-  }
-}
-
-function addHolographicBillboard(root, renderer, animated) {
-  const texture = createSignTexture({
-    title: 'RAIN DISTRICT',
-    subtitle: 'LOWER CITY // SECTOR 03',
-    glyph: '雨の街',
-    accent: '#64f6ff',
-    accent2: '#ff2d95',
-    seed: 991,
-  });
-  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    opacity: 0.78,
+    opacity: 0.3,
     blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
     depthWrite: false,
     toneMapped: false,
+  }));
+  sprite.position.set(x - side * 1.58, 4.83, z);
+  sprite.scale.set(2.1, 2.1, 1);
+  root.add(sprite);
+  if (!isQuest || index % 2 === 0) {
+    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 15 : 22, 10.5, 2.1);
+    light.position.copy(sprite.position);
+    root.add(light);
+  }
+}
+
+function addStreetFurniture(root, materials, isQuest) {
+  const glowTexture = createRadialTexture([
+    [0, 'rgba(255,255,255,.95)'],
+    [0.08, 'rgba(255,244,220,.8)'],
+    [0.3, 'rgba(255,190,120,.18)'],
+    [1, 'rgba(0,0,0,0)'],
+  ]);
+  const lampPositions = [-43, -27, -10, 8, 25, 42];
+  lampPositions.forEach((z, index) => {
+    const side = index % 2 === 0 ? -1 : 1;
+    addLamp(root, materials, side, z, index, glowTexture, isQuest);
   });
-  const billboard = new THREE.Mesh(new THREE.PlaneGeometry(11.5, 3.8), material);
-  billboard.name = 'RAIN_DISTRICT_HOLO';
-  billboard.position.set(0, 9.2, -54);
-  root.add(billboard);
-  const glow = new THREE.PointLight(0x5aeaff, 24, 22, 2);
-  glow.position.set(0, 8.5, -49);
-  root.add(glow);
-  animated.push((elapsed) => {
-    const scan = Math.sin(elapsed * 6.7);
-    material.opacity = scan > 0.965 ? 0.38 : 0.72 + Math.sin(elapsed * 1.25) * 0.07;
-    billboard.position.y = 9.2 + Math.sin(elapsed * 0.55) * 0.08;
+
+  for (const side of [-1, 1]) {
+    for (let z = -44; z <= 44; z += 8.8) {
+      addCylinder(root, UNIT_CYLINDER_8, materials.paintedMetal, [0.095, 0.82, 0.095], [side * 7.0, 0.49, z]);
+      addCylinder(root, UNIT_CYLINDER_8, materials.blackMetal, [0.13, 0.08, 0.13], [side * 7.0, 0.89, z]);
+    }
+  }
+
+  const propData = [
+    [-10.25, 36, 'bin'], [10.1, 29, 'crate'], [-10.0, 13, 'crate'], [10.05, -17, 'bin'],
+    [-10.2, -33, 'cabinet'], [10.15, -42, 'crate'], [-9.95, -7, 'cabinet'],
+  ];
+  propData.forEach(([x, z, type], index) => {
+    if (type === 'bin') {
+      addBox(root, materials.paintedMetal, [0.9, 1.2, 0.95], [x, 0.72, z], { castShadow: true });
+      addBox(root, materials.blackMetal, [0.98, 0.12, 1.02], [x, 1.36, z], { rotation: [0, 0, index % 2 ? 0.04 : -0.04] });
+      for (const wheel of [-0.3, 0.3]) {
+        addCylinder(root, UNIT_CYLINDER_16, materials.rubber, [0.12, 0.08, 0.12], [x + 0.46 * Math.sign(x), 0.2, z + wheel], [0, 0, Math.PI / 2]);
+      }
+    } else if (type === 'cabinet') {
+      addBox(root, materials.metal, [0.58, 1.55, 1.18], [x, 0.9, z], { castShadow: true });
+      addBox(root, materials.blackMetal, [0.08, 1.24, 0.88], [x - Math.sign(x) * 0.33, 0.94, z]);
+      for (let y = 0.48; y <= 1.35; y += 0.22) {
+        addBox(root, materials.paintedMetal, [0.07, 0.055, 0.68], [x - Math.sign(x) * 0.39, y, z]);
+      }
+    } else {
+      addBox(root, materials.concreteDark, [0.72, 0.62, 1.1], [x, 0.44, z], { castShadow: true });
+      addBox(root, materials.paintedMetal, [0.76, 0.05, 1.14], [x, 0.77, z]);
+      addBox(root, materials.blackMetal, [0.04, 0.64, 1.15], [x - Math.sign(x) * 0.39, 0.46, z]);
+    }
   });
 }
 
-function addDistantCity(root) {
-  const random = seededRandom(21807);
+function addVendingMachine(root, materials, side, z, color) {
+  const x = side * 10.25;
+  const body = new THREE.Group();
+  body.position.set(x, 1.18, z);
+  addBox(body, materials.paintedMetal, [0.8, 2.36, 1.18], [0, 0, 0], { castShadow: true });
+  const lightMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color).multiplyScalar(0.5),
+    emissive: color,
+    emissiveIntensity: 1.15,
+    roughness: 0.25,
+  });
+  addBox(body, lightMaterial, [0.055, 1.25, 0.84], [-side * 0.43, 0.32, 0]);
+  addBox(body, materials.darkGlass, [0.06, 0.72, 0.62], [-side * 0.47, 0.5, 0]);
+  for (let row = -0.18; row <= 0.72; row += 0.3) {
+    addBox(body, materials.blackMetal, [0.065, 0.035, 0.62], [-side * 0.5, row, 0]);
+  }
+  addBox(body, materials.blackMetal, [0.08, 0.28, 0.55], [-side * 0.48, -0.76, 0]);
+  root.add(body);
+  const light = new THREE.PointLight(color, 8, 4.5, 2);
+  light.position.set(x - side * 0.8, 1.55, z);
+  root.add(light);
+}
+
+function addSideAlleys(root, materials) {
+  const floorMaterial = materials.road.clone();
+  floorMaterial.color.multiplyScalar(0.7);
+  const wallMaterial = materials.concreteDark.clone();
+  const amber = new THREE.MeshStandardMaterial({ color: 0x8b5a35, emissive: 0xff9d4f, emissiveIntensity: 1.8 });
+  const cyan = new THREE.MeshStandardMaterial({ color: 0x315f62, emissive: 0x4ea9a6, emissiveIntensity: 1.15 });
+
+  for (const side of [-1, 1]) {
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 4.65), floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(side * 19.05, 0.025, 0);
+    root.add(floor);
+    addBox(root, wallMaterial, [0.5, 8.5, 4.8], [side * 27.0, 4.25, 0], { castShadow: true });
+    addBox(root, materials.blackMetal, [14.8, 0.18, 0.18], [side * 19.0, 3.7, -2.0]);
+    addBox(root, materials.copper, [14.5, 0.11, 0.11], [side * 19.0, 5.1, 1.5]);
+    addBox(root, materials.paintedMetal, [1.05, 2.0, 1.1], [side * 24.8, 1.1, side > 0 ? 1.3 : -1.2]);
+    addBox(root, materials.blackMetal, [0.65, 0.85, 1.2], [side * 21.8, 0.55, side > 0 ? -1.15 : 1.1]);
+    addBox(root, side < 0 ? amber : cyan, [0.08, 0.11, 2.7], [side * 26.72, 3.4, 0]);
+    const light = new THREE.PointLight(side < 0 ? 0xff9d55 : 0x55b6b0, 17, 10, 2);
+    light.position.set(side * 24.5, 3.3, 0);
+    root.add(light);
+  }
+}
+
+function addSkybridge(root, materials) {
+  const bridge = new THREE.Group();
+  bridge.name = 'SERVICE_SKYBRIDGE';
+  bridge.position.set(0, 13.25, -14);
+  addBox(bridge, materials.blackMetal, [24.2, 0.34, 2.75], [0, -1.35, 0], { castShadow: true });
+  addBox(bridge, materials.metal, [24.2, 0.28, 2.75], [0, 1.4, 0], { castShadow: true });
+  const glass = materials.darkGlass.clone();
+  glass.opacity = 0.76;
+  for (const z of [-1.32, 1.32]) {
+    addBox(bridge, glass, [23.7, 2.4, 0.08], [0, 0.05, z]);
+    addBox(bridge, materials.metal, [23.9, 0.1, 0.12], [0, -0.65, z]);
+  }
+  for (let x = -11.7; x <= 11.7; x += 1.95) {
+    for (const z of [-1.39, 1.39]) {
+      addBox(bridge, materials.blackMetal, [0.09, 2.65, 0.1], [x, 0.02, z]);
+    }
+  }
+  const warm = new THREE.MeshStandardMaterial({ color: 0x7d5a3c, emissive: 0xffb16c, emissiveIntensity: 1.55 });
+  for (const x of [-7, 0, 7]) {
+    addBox(bridge, warm, [1.4, 0.06, 0.14], [x, 1.2, 0]);
+  }
+  root.add(bridge);
+}
+
+function addOverheadCables(root, materials) {
+  const cableMaterial = materials.rubber;
+  const crossStreet = [
+    [[-10.2, 8.2, 33], [0, 6.7, 33.3], [10.2, 8.6, 32.7]],
+    [[-10.4, 10.8, 11], [0, 8.9, 11.4], [10.2, 10.2, 10.8]],
+    [[-10.1, 9.5, -25], [0, 7.8, -25.6], [10.3, 9.9, -24.9]],
+    [[-10.2, 12.1, -44], [0, 10.4, -43.5], [10.3, 11.6, -44.2]],
+  ];
+  crossStreet.forEach((points, index) => {
+    const curve = new THREE.CatmullRomCurve3(points.map((point) => new THREE.Vector3(...point)));
+    const cable = new THREE.Mesh(new THREE.TubeGeometry(curve, 22, 0.027 + index * 0.004, 5, false), cableMaterial);
+    root.add(cable);
+  });
+  for (const side of [-1, 1]) {
+    for (let cableIndex = 0; cableIndex < 3; cableIndex += 1) {
+      const x = side * (10.25 + cableIndex * 0.16);
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(x, 7.7 + cableIndex * 0.22, -54),
+        new THREE.Vector3(x + side * 0.18, 7.1 + cableIndex * 0.21, -18),
+        new THREE.Vector3(x - side * 0.15, 7.35 + cableIndex * 0.22, 18),
+        new THREE.Vector3(x, 7.85 + cableIndex * 0.2, 54),
+      ]);
+      root.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 60, 0.018, 4, false), cableMaterial));
+    }
+  }
+}
+
+function addFarTransit(root, materials, renderer) {
+  const structure = new THREE.Group();
+  structure.name = 'DISTANT_ELEVATED_SERVICE_LINE';
+  structure.position.z = -59;
+  for (const x of [-15, 15]) {
+    addBox(structure, materials.concreteDark, [2.1, 11, 2.6], [x, 5.5, 0], { castShadow: true });
+    addBox(structure, materials.metal, [3.4, 0.5, 3.5], [x, 10.8, 0]);
+  }
+  addBox(structure, materials.blackMetal, [42, 1.2, 4.8], [0, 11.3, 0], { castShadow: true });
+  addBox(structure, materials.paintedMetal, [42, 0.22, 5.4], [0, 12.0, 0]);
+  for (let x = -20; x <= 20; x += 3.2) {
+    addBox(structure, materials.metal, [0.16, 1.5, 5.0], [x, 11.1, 0], { rotation: [0.28 * (x % 2 ? 1 : -1), 0, 0] });
+  }
+  const signTexture = createWayfindingTexture(STREET_SIGNS[0]);
+  signTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const signMaterial = new THREE.MeshStandardMaterial({
+    map: signTexture,
+    emissiveMap: signTexture,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.5,
+    roughness: 0.45,
+  });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(8.8, 2.2), signMaterial);
+  sign.position.set(0, 8.55, 2.45);
+  structure.add(sign);
+  root.add(structure);
+}
+
+function addDistantCity(root, materials) {
+  const random = seededRandom(72401);
+  const count = 88;
   const geometry = new THREE.BoxGeometry(1, 1, 1);
-  const material = new THREE.MeshStandardMaterial({ color: 0x07101c, roughness: 0.72, metalness: 0.35 });
-  const count = 72;
-  const skyline = new THREE.InstancedMesh(geometry, material, count);
+  const skylineMaterial = materials.concreteDark.clone();
+  skylineMaterial.color.set(0x22292a);
+  skylineMaterial.roughness = 0.82;
+  const skyline = new THREE.InstancedMesh(geometry, skylineMaterial, count);
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
   const scale = new THREE.Vector3();
   for (let index = 0; index < count; index += 1) {
-    const back = index < count / 2;
-    const z = back ? -70 - random() * 75 : 60 + random() * 80;
+    const behind = index < count * 0.64;
+    const z = behind ? -72 - random() * 105 : 67 + random() * 88;
     const side = random() > 0.5 ? 1 : -1;
-    const x = side * (22 + random() * 70);
-    const width = 8 + random() * 18;
-    const depth = 8 + random() * 18;
-    const height = 18 + Math.pow(random(), 0.56) * 88;
+    const x = side * (25 + random() * 82);
+    const width = 5 + random() * 16;
+    const depth = 6 + random() * 18;
+    const height = 15 + Math.pow(random(), 0.48) * 92;
     position.set(x, height / 2 - 1, z);
     scale.set(width, height, depth);
     matrix.compose(position, quaternion, scale);
     skyline.setMatrixAt(index, matrix);
   }
   skyline.instanceMatrix.needsUpdate = true;
-  skyline.name = 'DISTANT_SKYLINE';
+  skyline.name = 'FOGGED_DISTANT_CITY';
   root.add(skyline);
 
-  const aerialMaterial = new THREE.MeshBasicMaterial({ color: 0x17395c, transparent: true, opacity: 0.18, toneMapped: false });
-  const aerialGeometry = new THREE.BoxGeometry(0.18, 0.12, 3.5);
-  for (let index = 0; index < 16; index += 1) {
-    const light = new THREE.Mesh(aerialGeometry, aerialMaterial);
-    light.position.set((random() - 0.5) * 120, 18 + random() * 48, -55 - random() * 78);
+  const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xc49360, transparent: true, opacity: 0.26, toneMapped: false });
+  const windowGeometry = new THREE.BoxGeometry(0.12, 0.12, 2.0);
+  for (let index = 0; index < 28; index += 1) {
+    const light = new THREE.Mesh(windowGeometry, windowMaterial);
+    light.position.set((random() > 0.5 ? 1 : -1) * (28 + random() * 60), 12 + random() * 50, -70 - random() * 80);
     light.rotation.y = random() * Math.PI;
     root.add(light);
   }
 }
 
-function addFacadeLightBeams(root) {
-  const beamGeometry = new THREE.CylinderGeometry(0.5, 4.2, 20, 16, 1, true);
-  const beams = [
-    [-10.4, 10, 9, 0xff2d95],
-    [10.4, 10, -29, 0x58efff],
-    [-10.4, 10, -38, 0x8666ff],
-  ];
-  beams.forEach(([x, y, z, color]) => {
-    const material = new THREE.MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.022,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      toneMapped: false,
-    });
-    const beam = new THREE.Mesh(beamGeometry, material);
-    beam.position.set(x, y, z);
-    beam.rotation.z = x < 0 ? -0.15 : 0.15;
-    root.add(beam);
-  });
-}
-
-function addMarketDetails(root, renderer) {
-  addVendingMachine(root, renderer, -1, 31, 0xff378f, 'KOLA');
-  addVendingMachine(root, renderer, 1, 6, 0x5defff, 'AQUA');
-  addVendingMachine(root, renderer, -1, -17, 0x8d6aff, 'VOID');
-
-  const shutter = new THREE.MeshStandardMaterial({ color: 0x242b34, roughness: 0.5, metalness: 0.78 });
-  const warning = new THREE.MeshBasicMaterial({ color: 0xffc05a, toneMapped: false });
-  const cabinetGeometry = new THREE.BoxGeometry(0.72, 1.6, 1.2);
-  for (const [x, z, rotation] of [[-10.75, 5, 0], [10.75, 29, Math.PI], [-10.75, -42, 0]]) {
-    const cabinet = makeBox(root, cabinetGeometry, shutter, [x, 0.92, z]);
-    cabinet.rotation.y = rotation;
-    for (let y = -0.45; y <= 0.45; y += 0.18) makeBox(cabinet, new THREE.BoxGeometry(0.76, 0.035, 0.92), warning, [0, y, 0.61]);
-  }
-
-  const posterTexture = createSignTexture({
-    title: SIGN_COPY[1][0],
-    subtitle: SIGN_COPY[1][1],
-    glyph: '記憶',
-    accent: '#ff447f',
-    accent2: '#72f5ff',
-    vertical: true,
-    seed: 234,
-  });
-  posterTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const poster = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.35, 4.2),
-    new THREE.MeshBasicMaterial({ map: posterTexture, toneMapped: false, side: THREE.DoubleSide }),
-  );
-  poster.position.set(-10.92, 3.15, -2.4);
-  poster.rotation.y = Math.PI / 2;
-  root.add(poster);
-}
-
 export function createCyberCity({ scene, renderer, isQuest = false }) {
   const root = new THREE.Group();
-  root.name = 'RAIN_DISTRICT_03';
+  root.name = 'LOWER_WARD_BLOCK_03';
   scene.add(root);
   const animated = [];
   const colliders = [];
   const slotGroups = new Map();
+  const materials = createMaterialLibrary(renderer);
 
   addSky(scene);
-  addLighting(scene);
-  addStreetSurface(root, renderer);
-  addStreetFurniture(root, scene, isQuest);
-  addSkybridge(root, animated);
-  addOverheadCables(root);
-  addHolographicBillboard(root, renderer, animated);
-  addDistantCity(root);
-  addFacadeLightBeams(root);
-  addMarketDetails(root, renderer);
+  addLighting(scene, isQuest);
+  addRoad(root, materials);
+  addRoadHardware(root, materials);
+  addStreetFurniture(root, materials, isQuest);
+  addVendingMachine(root, materials, -1, 28.5, 0x4ca7a3);
+  addVendingMachine(root, materials, 1, 3.7, 0xc26a49);
+  addVendingMachine(root, materials, -1, -21.5, 0xa84c63);
+  addSideAlleys(root, materials);
+  addSkybridge(root, materials);
+  addOverheadCables(root, materials);
+  addFarTransit(root, materials, renderer);
+  addDistantCity(root, materials);
 
-  const factory = new BuildingFactory({ renderer, animated });
+  const factory = new BuildingFactory({ renderer, animated, materials });
   BUILDING_SLOTS.forEach((definition) => {
     const building = factory.create(definition);
     root.add(building);
@@ -546,5 +611,6 @@ export function createCyberCity({ scene, renderer, isQuest = false }) {
     bounds: CITY_BOUNDS,
     assetRegistry,
     slots: BUILDING_SLOTS,
+    materials,
   };
 }

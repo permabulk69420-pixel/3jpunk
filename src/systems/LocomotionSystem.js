@@ -39,7 +39,7 @@ export class LocomotionSystem {
     this.walkSpeed = 3.25;
     this.sprintSpeed = 5.6;
     this.turnRate = THREE.MathUtils.degToRad(102);
-    this.pitch = 0.075;
+    this.pitch = 0.035;
     this.yaw = 0;
     this.#configureControllers();
     this.#bindDesktopControls();

@@ -259,24 +259,24 @@ export function createNeonEnvironment(renderer) {
   canvas.height = 512;
   const context = canvas.getContext('2d');
   const sky = context.createLinearGradient(0, 0, 0, 512);
-  sky.addColorStop(0, '#02040d');
-  sky.addColorStop(0.45, '#071221');
-  sky.addColorStop(0.76, '#15253a');
-  sky.addColorStop(1, '#03050b');
+  sky.addColorStop(0, '#030506');
+  sky.addColorStop(0.45, '#0b1113');
+  sky.addColorStop(0.76, '#233033');
+  sky.addColorStop(1, '#090a09');
   context.fillStyle = sky;
   context.fillRect(0, 0, 1024, 512);
 
   const glows = [
-    [130, '#ff2d95'],
-    [325, '#64f6ff'],
-    [560, '#ff7b45'],
-    [820, '#6dffae'],
+    [120, '#b65f4c'],
+    [340, '#5e9c99'],
+    [590, '#d3915f'],
+    [840, '#6f9192'],
   ];
   glows.forEach(([x, color]) => {
     const gradient = context.createRadialGradient(x, 350, 0, x, 350, 190);
     gradient.addColorStop(0, color);
-    gradient.addColorStop(0.08, `${color}aa`);
-    gradient.addColorStop(0.45, `${color}22`);
+    gradient.addColorStop(0.08, `${color}88`);
+    gradient.addColorStop(0.45, `${color}1c`);
     gradient.addColorStop(1, 'transparent');
     context.fillStyle = gradient;
     context.fillRect(x - 200, 150, 400, 360);

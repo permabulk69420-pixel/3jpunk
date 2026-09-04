@@ -14,19 +14,20 @@ const soundButton = document.querySelector('#sound-toggle');
 const statusLabel = document.querySelector('#status-label');
 const modeLabel = document.querySelector('#mode-label');
 const vrButtonSlot = document.querySelector('#vr-button-slot');
+const captureMode = new URLSearchParams(window.location.search).get('capture');
 
 const isQuest = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x02040b);
-scene.fog = new THREE.FogExp2(0x07101d, isQuest ? 0.015 : 0.013);
+scene.background = new THREE.Color(0x050708);
+scene.fog = new THREE.FogExp2(0x151c1e, isQuest ? 0.017 : 0.014);
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.06, 340);
 camera.position.set(0, 1.68, 0);
-camera.rotation.x = 0.075;
+camera.rotation.x = 0.035;
 
 const playerRig = new THREE.Group();
 playerRig.name = 'PLAYER_RIG';
-playerRig.position.set(0, 0, 41.5);
+playerRig.position.set(0, 0, 43.5);
 playerRig.add(camera);
 scene.add(playerRig);
 
@@ -41,10 +42,26 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, isQuest ? 1.28 : 1.65))
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = isQuest ? 1.02 : 1.08;
+renderer.toneMappingExposure = isQuest ? 1.12 : 1.16;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
+renderer.xr.setFramebufferScaleFactor(isQuest ? 1.08 : 1.15);
 viewport.appendChild(renderer.domElement);
+
+if (captureMode) {
+  document.body.classList.add('is-capture');
+  const captureViews = {
+    street: { position: [1.2, 0, 43.5], yaw: 0.035, pitch: 0.045 },
+    bridge: { position: [-3.8, 0, 21], yaw: -0.17, pitch: 0.08 },
+    alley: { position: [1.6, 0, 8.5], yaw: 0.72, pitch: 0.025 },
+  };
+  const view = captureViews[captureMode] || captureViews.street;
+  playerRig.position.set(...view.position);
+  playerRig.rotation.y = view.yaw;
+  camera.rotation.x = view.pitch;
+}
 
 const environmentTarget = createNeonEnvironment(renderer);
 scene.environment = environmentTarget.texture;
@@ -104,6 +121,7 @@ soundButton.addEventListener('click', async () => {
 renderer.xr.addEventListener('sessionstart', () => {
   intro.classList.add('is-hidden');
   document.querySelector('#vignette').style.display = 'none';
+  if (renderer.xr.setFoveation) renderer.xr.setFoveation(0.65);
 });
 
 renderer.xr.addEventListener('sessionend', () => {
@@ -133,9 +151,9 @@ renderer.setAnimationLoop(() => {
   atmosphere.update(delta, elapsed);
   city.animated.forEach((update) => update(elapsed, delta));
 
-  if (!renderer.xr.isPresenting && !locomotion.isDesktopExploring) {
+  if (!captureMode && !renderer.xr.isPresenting && !locomotion.isDesktopExploring) {
     camera.rotation.y = Math.sin(elapsed * 0.12) * 0.012;
-    camera.rotation.x = 0.075 + Math.sin(elapsed * 0.19) * 0.006;
+    camera.rotation.x = 0.035 + Math.sin(elapsed * 0.19) * 0.005;
   }
 
   renderer.render(scene, camera);
