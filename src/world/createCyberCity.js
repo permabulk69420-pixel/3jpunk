@@ -420,6 +420,10 @@ function addSideAlleys(root, materials) {
   const cyan = new THREE.MeshStandardMaterial({ color: 0x315f62, emissive: 0x4ea9a6, emissiveIntensity: 1.15 });
 
   for (const side of [-1, 1]) {
+    const cabinetX = side * 24.8;
+    const cabinetZ = side > 0 ? 1.3 : -1.2;
+    const caseX = side * 21.8;
+    const caseZ = side > 0 ? -1.15 : 1.1;
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(15.5, 4.65), floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.position.set(side * 19.05, 0.025, 0);
@@ -427,8 +431,29 @@ function addSideAlleys(root, materials) {
     addBox(root, wallMaterial, [0.5, 8.5, 4.8], [side * 27.0, 4.25, 0], { castShadow: true });
     addBox(root, materials.blackMetal, [14.8, 0.18, 0.18], [side * 19.0, 3.7, -2.0]);
     addBox(root, materials.copper, [14.5, 0.11, 0.11], [side * 19.0, 5.1, 1.5]);
-    addBox(root, materials.paintedMetal, [1.05, 2.0, 1.1], [side * 24.8, 1.1, side > 0 ? 1.3 : -1.2]);
-    addBox(root, materials.blackMetal, [0.65, 0.85, 1.2], [side * 21.8, 0.55, side > 0 ? -1.15 : 1.1]);
+    addBox(root, materials.paintedMetal, [1.05, 2.0, 1.1], [cabinetX, 1.1, cabinetZ], { castShadow: true });
+    addBox(root, materials.blackMetal, [1.18, 0.1, 1.22], [cabinetX, 2.14, cabinetZ]);
+    addStreetFacingPanel(
+      root,
+      materials.municipalService,
+      [0.88, 1.56],
+      [cabinetX - side * 0.576, 1.14, cabinetZ],
+      side,
+      'ALLEY_SERVICE_PANEL',
+    );
+    for (const railZ of [-0.5, 0.5]) {
+      addBox(root, materials.blackMetal, [0.08, 1.76, 0.055], [cabinetX - side * 0.54, 1.12, cabinetZ + railZ]);
+    }
+    addCylinder(root, UNIT_CYLINDER_16, materials.copper, [0.045, 1.8, 0.045], [cabinetX + side * 0.35, 3.05, cabinetZ + 0.43]);
+
+    addBox(root, materials.blackMetal, [0.7, 0.86, 1.2], [caseX, 0.55, caseZ]);
+    addBox(root, materials.paintedMetal, [0.76, 0.1, 1.28], [caseX, 1.02, caseZ]);
+    for (const railZ of [-0.51, 0.51]) {
+      addBox(root, materials.metal, [0.76, 0.75, 0.07], [caseX, 0.57, caseZ + railZ]);
+    }
+    for (const railY of [0.34, 0.76]) {
+      addBox(root, materials.metal, [0.76, 0.06, 1.08], [caseX, railY, caseZ]);
+    }
     addBox(root, side < 0 ? amber : cyan, [0.08, 0.11, 2.7], [side * 26.72, 3.4, 0]);
   }
 }

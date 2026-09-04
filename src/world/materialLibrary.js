@@ -25,6 +25,18 @@ const TEXTURES = {
   municipalService: {
     color: new URL('../assets/materials/municipal-service-front.webp', import.meta.url).href,
   },
+  posterTransit: {
+    color: new URL('../assets/materials/poster-transit.webp', import.meta.url).href,
+  },
+  posterMaintenance: {
+    color: new URL('../assets/materials/poster-maintenance.webp', import.meta.url).href,
+  },
+  posterProvisions: {
+    color: new URL('../assets/materials/poster-provisions.webp', import.meta.url).href,
+  },
+  posterStorm: {
+    color: new URL('../assets/materials/poster-storm.webp', import.meta.url).href,
+  },
   asphalt: {
     color: new URL('../assets/materials/asphalt-albedo.webp', import.meta.url).href,
     height: new URL('../assets/materials/asphalt-height.webp', import.meta.url).href,
@@ -90,6 +102,10 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const vendingDrinks = loadClampedTexture(loader, renderer, TEXTURES.vendingDrinks.color, true, isQuest);
   const vendingEssentials = loadClampedTexture(loader, renderer, TEXTURES.vendingEssentials.color, true, isQuest);
   const municipalService = loadClampedTexture(loader, renderer, TEXTURES.municipalService.color, true, isQuest);
+  const posterTransit = loadClampedTexture(loader, renderer, TEXTURES.posterTransit.color, true, isQuest);
+  const posterMaintenance = loadClampedTexture(loader, renderer, TEXTURES.posterMaintenance.color, true, isQuest);
+  const posterProvisions = loadClampedTexture(loader, renderer, TEXTURES.posterProvisions.color, true, isQuest);
+  const posterStorm = loadClampedTexture(loader, renderer, TEXTURES.posterStorm.color, true, isQuest);
 
   const materials = {
     vendingDrinks: new THREE.MeshStandardMaterial({
@@ -112,6 +128,34 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
       roughness: 0.57,
       metalness: 0.42,
       envMapIntensity: 0.92,
+    }),
+    posterTransit: new THREE.MeshStandardMaterial({
+      map: posterTransit,
+      roughness: 0.88,
+      metalness: 0,
+      envMapIntensity: 0.2,
+      side: THREE.DoubleSide,
+    }),
+    posterMaintenance: new THREE.MeshStandardMaterial({
+      map: posterMaintenance,
+      roughness: 0.88,
+      metalness: 0,
+      envMapIntensity: 0.2,
+      side: THREE.DoubleSide,
+    }),
+    posterProvisions: new THREE.MeshStandardMaterial({
+      map: posterProvisions,
+      roughness: 0.88,
+      metalness: 0,
+      envMapIntensity: 0.2,
+      side: THREE.DoubleSide,
+    }),
+    posterStorm: new THREE.MeshStandardMaterial({
+      map: posterStorm,
+      roughness: 0.88,
+      metalness: 0,
+      envMapIntensity: 0.2,
+      side: THREE.DoubleSide,
     }),
     wardwatchScreen: new THREE.MeshStandardMaterial({
       map: wardwatch,

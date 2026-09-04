@@ -51,6 +51,35 @@ Exclude:
 
 The words “orthographic,” “front elevation,” “edge-to-edge,” and “map directly onto a plane” do most of the technical work. The construction-identity section prevents every result from becoming the same generic tower with a different tint.
 
+## Prop front-panel pipeline
+
+Small street props use the same division of labour at a different scale. The image model supplies dense front-face information that would be wasteful to model individually: product packets, latches, vents, seals, fingerprints, taped repairs and printed control graphics. Shared boxes, rails, caps and feet provide the actual silhouette and parallax.
+
+1. Generate a single straight-on, orthographic front face at the prop's real aspect ratio. Explicitly exclude side surfaces, floor, scene lighting, perspective and cast shadows.
+2. Describe the construction in functional terms. A vending machine needs product bays, selection controls, payment hardware and a dispensing hatch; a service cabinet needs a door, hinges, grille, latch and conduit ports.
+3. State that ordinary metal, glass, plastic, paper and products must not glow. Baked bloom in an albedo texture makes the entire prop look self-illuminated under every lighting condition.
+4. Downscale tall prop panels to `512x1024` and service panels to `512x640`. Use one panel material on repeated geometry rather than creating a material per placed object.
+5. Add any true light as separate tiny geometry. The current machines have one physical status LED; their generated face textures remain normal `MeshStandardMaterial` albedo.
+6. Put the textured plane a few millimetres in front of the backing shell and let real casing rails cover its edges. This hides the flat-card silhouette at close VR range.
+
+For paper graphics, one image-generation call can produce a clean 2x2 contact sheet with hard gutters. Crop the accepted quadrants into shared `384x512` WebP posters. This produces four materially different designs while avoiding per-building runtime canvas textures.
+
+### Prop prompt pattern
+
+```text
+Create a production-ready [PROP] FRONT PANEL for a game.
+
+- straight-on orthographic elevation, [ASPECT] portrait proportions
+- rectangular face fills the canvas; zero perspective and no side surfaces
+- believable functional components: [COMPONENT LIST]
+- grounded wear: rain grime, seals, screws, scratches and repaired paint
+- neutral frontal light with minimal baked highlights
+- ordinary materials must not glow
+- no scene, floor, cast shadow, people, logos or readable text
+```
+
+Naming the output a “front panel” is useful: it encourages edge-to-edge surface information instead of a product shot floating in empty space.
+
 ## Conversion
 
 The raw generation is kept outside the deployed project. A typical conversion is:

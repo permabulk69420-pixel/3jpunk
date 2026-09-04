@@ -121,42 +121,6 @@ function makeSignTexture({ title, subtitle, localLabel, accent, vertical = false
   return texture;
 }
 
-function makePosterTexture(seed, accent) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 384;
-  canvas.height = 512;
-  const context = canvas.getContext('2d');
-  const random = seededRandom(seed);
-  context.fillStyle = '#c8c1ae';
-  context.fillRect(0, 0, 384, 512);
-  context.fillStyle = accent;
-  context.fillRect(0, 0, 384, 74);
-  context.fillStyle = '#191c1c';
-  context.font = '900 46px Arial, sans-serif';
-  context.fillText('LOWER', 24, 128);
-  context.fillText('WARD', 24, 178);
-  context.font = '700 22px monospace';
-  context.fillText('NIGHT SERVICES', 25, 226);
-  context.strokeStyle = '#202727';
-  context.lineWidth = 10;
-  context.beginPath();
-  context.arc(192, 345, 86, 0, Math.PI * 2);
-  context.stroke();
-  context.beginPath();
-  context.moveTo(192, 259);
-  context.lineTo(192, 431);
-  context.moveTo(106, 345);
-  context.lineTo(278, 345);
-  context.stroke();
-  for (let index = 0; index < 80; index += 1) {
-    context.fillStyle = `rgba(20,24,24,${0.03 + random() * 0.09})`;
-    context.fillRect(random() * 384, random() * 512, 2 + random() * 24, 1 + random() * 4);
-  }
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
 export class BuildingFactory {
   constructor({ renderer, animated, materials, isQuest = false }) {
     this.renderer = renderer;
@@ -168,6 +132,7 @@ export class BuildingFactory {
     this.cylinder12 = new THREE.CylinderGeometry(1, 1, 1, 12);
     this.cylinder20 = new THREE.CylinderGeometry(1, 1, 1, 20);
     this.torus = new THREE.TorusGeometry(1, 0.11, 8, 24);
+    this.posterGeometry = new THREE.PlaneGeometry(0.72, 1.0);
     this.radialGlow = createRadialTexture([
       [0, 'rgba(255,255,255,.95)'],
       [0.08, 'rgba(255,245,220,.72)'],
@@ -202,7 +167,7 @@ export class BuildingFactory {
     this.#createRoof(group, definition, wallMaterial, random);
     batchStaticMeshes(
       group,
-      [this.boxGeometry, this.cylinder8, this.cylinder12, this.cylinder20, this.torus],
+      [this.boxGeometry, this.cylinder8, this.cylinder12, this.cylinder20, this.torus, this.posterGeometry],
       { prefix: `${definition.id}__batch`, recursive: false },
     );
 
@@ -277,7 +242,6 @@ export class BuildingFactory {
     const bayCount = 7;
     const baySpan = (depth - 1.7) / bayCount;
     const accent = new THREE.Color(definition.accent);
-    const accentCss = `#${accent.getHexString()}`;
     const accentMaterial = new THREE.MeshStandardMaterial({
       color: accent.clone().multiplyScalar(0.58),
       emissive: accent,
@@ -379,14 +343,9 @@ export class BuildingFactory {
       }
 
       if ((index + definition.seed) % 3 === 0) {
-        const posterTexture = makePosterTexture(definition.seed + index * 41, accentCss);
-        const posterMaterial = new THREE.MeshStandardMaterial({
-          map: posterTexture,
-          roughness: 0.8,
-          metalness: 0,
-          side: THREE.DoubleSide,
-        });
-        const poster = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 1.0), posterMaterial);
+        const posterKeys = ['posterTransit', 'posterMaintenance', 'posterProvisions', 'posterStorm'];
+        const posterKey = posterKeys[(definition.seed + index * 5) % posterKeys.length];
+        const poster = new THREE.Mesh(this.posterGeometry, this.materials[posterKey]);
         poster.position.set(facadeX + direction * 0.37, 1.86, z - frameDepth * 0.31);
         poster.rotation.y = -definition.side * Math.PI / 2;
         group.add(poster);
