@@ -119,7 +119,7 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
       roughnessMap: asphalt.bumpMap,
       emissiveMap: roadReflections,
       emissive: 0xffffff,
-      emissiveIntensity: isQuest ? 0.32 : 0.38,
+      emissiveIntensity: isQuest ? 0.14 : 0.17,
       color: 0x6b7072,
       bumpScale: 0.06,
       roughness: 0.76,
