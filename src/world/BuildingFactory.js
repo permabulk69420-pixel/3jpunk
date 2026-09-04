@@ -78,7 +78,7 @@ function makeSignTexture({ title, subtitle, localLabel, accent, vertical = false
     context.textAlign = 'center';
     context.fillStyle = '#e7e4da';
     context.font = '800 78px Arial, sans-serif';
-    const chars = [...(localLabel || title)].filter((character) => character !== ' ').slice(0, 4);
+    const chars = [...title].filter((character) => character !== ' ').slice(0, 4);
     chars.forEach((character, index) => {
       context.fillText(character, width * 0.52, 130 + index * 118);
     });

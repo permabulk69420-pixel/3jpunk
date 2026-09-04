@@ -62,34 +62,6 @@ function createWayfindingTexture(sign) {
   return texture;
 }
 
-function createReflectionTexture(color) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 1024;
-  const context = canvas.getContext('2d');
-  const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(0.18, color);
-  gradient.addColorStop(0.47, `${color}7a`);
-  gradient.addColorStop(0.72, `${color}20`);
-  gradient.addColorStop(1, 'rgba(0,0,0,0)');
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  const random = seededRandom(parseInt(color.slice(1), 16));
-  context.globalCompositeOperation = 'destination-out';
-  for (let index = 0; index < 90; index += 1) {
-    context.globalAlpha = 0.15 + random() * 0.58;
-    context.fillRect(random() * 256, random() * 1024, 2 + random() * 22, 1 + random() * 8);
-  }
-  context.globalCompositeOperation = 'source-over';
-  context.globalAlpha = 1;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  return texture;
-}
-
 function addSky(scene) {
   const material = new THREE.ShaderMaterial({
     side: THREE.BackSide,
@@ -148,6 +120,10 @@ function addLighting(scene, isQuest) {
   const hemisphere = new THREE.HemisphereLight(0x98acb0, 0x211815, 1.05);
   hemisphere.name = 'OVERCAST_AMBIENT';
   scene.add(hemisphere);
+
+  const cityBounce = new THREE.AmbientLight(0x71888b, 0.62);
+  cityBounce.name = 'CITY_SKY_BOUNCE';
+  scene.add(cityBounce);
 
   const moon = new THREE.DirectionalLight(0xb2c7c8, 2.0);
   moon.name = 'MOON_THROUGH_CLOUD';
@@ -272,28 +248,6 @@ function addRoad(root, materials) {
     root.add(puddle);
   }
 
-  const reflectionData = [
-    [-3.7, 30, '#d76c47', 1.4, 11],
-    [4.2, 18, '#4baaa8', 1.1, 9],
-    [-4.6, -10, '#b94867', 1.25, 10],
-    [3.8, -26, '#5d9da9', 1.05, 12],
-    [-2.2, -40, '#cf8b55', 0.8, 7],
-  ];
-  reflectionData.forEach(([x, z, color, width, length]) => {
-    const texture = createReflectionTexture(color);
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.11,
-      blending: THREE.NormalBlending,
-      depthWrite: false,
-      toneMapped: false,
-    });
-    const reflection = new THREE.Mesh(new THREE.PlaneGeometry(width, length), material);
-    reflection.rotation.x = -Math.PI / 2;
-    reflection.position.set(x, 0.057, z);
-    root.add(reflection);
-  });
 }
 
 function addRoadHardware(root, materials) {
@@ -347,9 +301,9 @@ function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
   sprite.position.set(x - side * 1.58, 4.83, z);
   sprite.scale.set(2.1, 2.1, 1);
   root.add(sprite);
-  const hasRealLight = isQuest ? index === 1 || index === 4 : index % 2 === 0;
+  const hasRealLight = isQuest ? [1, 4, 5].includes(index) : index % 2 === 0 || index === 5;
   if (hasRealLight) {
-    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 6 : 8, 8.5, 2.2);
+    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 22 : 32, 9.5, 2.2);
     light.position.copy(sprite.position);
     root.add(light);
   }
@@ -447,11 +401,10 @@ function addSkybridge(root, materials) {
   bridge.position.set(0, 13.25, -14);
   addBox(bridge, materials.blackMetal, [24.2, 0.34, 2.75], [0, -1.35, 0], { castShadow: true });
   addBox(bridge, materials.metal, [24.2, 0.28, 2.75], [0, 1.4, 0], { castShadow: true });
-  const glass = materials.darkGlass.clone();
-  glass.opacity = 0.76;
   for (const z of [-1.32, 1.32]) {
-    addBox(bridge, glass, [23.7, 2.4, 0.08], [0, 0.05, z]);
     addBox(bridge, materials.metal, [23.9, 0.1, 0.12], [0, -0.65, z]);
+    addBox(bridge, materials.paintedMetal, [23.9, 0.08, 0.12], [0, 0.35, z]);
+    addBox(bridge, materials.blackMetal, [23.9, 0.1, 0.12], [0, 1.18, z]);
   }
   for (let x = -11.7; x <= 11.7; x += 1.95) {
     for (const z of [-1.39, 1.39]) {

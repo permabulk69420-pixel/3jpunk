@@ -59,14 +59,14 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const materials = {
     facadeMixed: new THREE.MeshStandardMaterial({
       map: facadeMixed,
-      color: 0xd7d4cd,
+      color: 0xffffff,
       roughness: 0.68,
       metalness: 0.08,
       envMapIntensity: 0.72,
     }),
     facadeIndustrial: new THREE.MeshStandardMaterial({
       map: facadeIndustrial,
-      color: 0xd1d5d2,
+      color: 0xffffff,
       roughness: 0.64,
       metalness: 0.12,
       envMapIntensity: 0.78,
