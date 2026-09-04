@@ -64,6 +64,7 @@ jobs:
               --enable-unsafe-swiftshader \
               --use-gl=angle \
               --use-angle=swiftshader \
+              --user-agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 OculusBrowser/37.0 Quest 3" \
               --force-device-scale-factor=1 \
               --window-size=1440,900 \
               --virtual-time-budget=1200 \
