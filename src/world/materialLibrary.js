@@ -20,6 +20,9 @@ const TEXTURES = {
     color: new URL('../assets/materials/asphalt-albedo.webp', import.meta.url).href,
     height: new URL('../assets/materials/asphalt-height.webp', import.meta.url).href,
   },
+  roadReflections: {
+    color: new URL('../assets/materials/wet-road-reflections.webp', import.meta.url).href,
+  },
   concrete: {
     color: new URL('../assets/materials/facade-concrete-albedo.webp', import.meta.url).href,
     height: new URL('../assets/materials/facade-concrete-height.webp', import.meta.url).href,
@@ -58,6 +61,9 @@ function surfacePair(loader, renderer, key, repeat, isQuest) {
 export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const loader = new THREE.TextureLoader();
   const asphalt = surfacePair(loader, renderer, 'asphalt', [2.2, 17], isQuest);
+  const roadReflections = loadTexture(loader, renderer, TEXTURES.roadReflections.color, [1, 1], true, isQuest);
+  roadReflections.wrapS = THREE.ClampToEdgeWrapping;
+  roadReflections.wrapT = THREE.ClampToEdgeWrapping;
   const sidewalk = surfacePair(loader, renderer, 'sidewalk', [1.5, 19], isQuest);
   const concrete = surfacePair(loader, renderer, 'concrete', [2.2, 5.4], isQuest);
   const brick = surfacePair(loader, renderer, 'brick', [2.7, 5.2], isQuest);
@@ -111,6 +117,9 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
     road: new THREE.MeshStandardMaterial({
       ...asphalt,
       roughnessMap: asphalt.bumpMap,
+      emissiveMap: roadReflections,
+      emissive: 0xffffff,
+      emissiveIntensity: isQuest ? 0.32 : 0.38,
       color: 0x6b7072,
       bumpScale: 0.06,
       roughness: 0.76,

@@ -54,19 +54,19 @@ export class AtmosphereSystem {
   #createRipples() {
     const rippleTexture = createRadialTexture([
       [0, 'rgba(255,255,255,0)'],
-      [0.5, 'rgba(122,225,255,0)'],
-      [0.64, 'rgba(160,236,255,.9)'],
-      [0.73, 'rgba(92,188,225,.12)'],
+      [0.54, 'rgba(190,210,210,0)'],
+      [0.65, 'rgba(204,220,218,.34)'],
+      [0.72, 'rgba(154,178,180,.06)'],
       [1, 'rgba(0,0,0,0)'],
     ]);
     const material = new THREE.MeshBasicMaterial({
       map: rippleTexture,
-      color: 0x9beaff,
+      color: 0xa8b8b8,
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.11,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      toneMapped: false,
+      blending: THREE.NormalBlending,
+      toneMapped: true,
     });
     const geometry = new THREE.PlaneGeometry(1, 1);
     this.rippleCount = this.isQuest ? 16 : 28;
@@ -154,7 +154,7 @@ export class AtmosphereSystem {
 
     this.rippleState.forEach((state, index) => {
       const cycle = (elapsedSeconds * state.speed + state.phase) % 1;
-      const size = 0.08 + cycle * 0.68;
+      const size = 0.06 + cycle * 0.58;
       let rippleZ = focusZ + state.z;
       if (rippleZ < -51) rippleZ += 100;
       if (rippleZ > 51) rippleZ -= 100;

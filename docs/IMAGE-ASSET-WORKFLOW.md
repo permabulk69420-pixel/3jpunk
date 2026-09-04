@@ -95,9 +95,9 @@ The road avoids separate black oval puddle meshes. Its existing grayscale asphal
 - lighter aggregate stays rough;
 - darker organic patches become smoother and pick up the generated environment map;
 - one road surface replaces dozens of puddle objects;
-- a single instanced ripple system supplies motion near the player.
+- a single instanced, near-neutral ripple system supplies motion near the player.
 
-This gives broken, irregular wet reflections without screen-space reflections, planar-reflection render passes or transparent full-road overlays. Those alternatives are substantially more expensive on standalone Quest.
+A sparse image-generated reflection atlas contributes only the broken cyan, amber and dusty-magenta pixels. It is sampled as a restrained `emissiveMap` by the existing opaque road material, so it adds no road overlay, geometry or dynamic light. The black majority of the atlas contributes nothing. This gives authored sign reflections without screen-space reflections, planar-reflection render passes or transparent full-road overlays; those alternatives are substantially more expensive on standalone Quest.
 
 ## Screen artwork
 
@@ -122,4 +122,3 @@ The screenshots are not a headset frame-rate benchmark, but they catch bad UVs, 
 | `nami-eatery` | weathered industrial tenement | fire escape, horizontal roof vessels, drying frames |
 | `kuroda-works` | brick-and-steel repair works | heavy ribs, exhaust stacks, sawtooth plant roof |
 | `echo-capsules` | pale modular capsule hotel | module rails, stepped mechanical crown, antenna array |
-

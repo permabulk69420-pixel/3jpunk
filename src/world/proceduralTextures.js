@@ -222,37 +222,6 @@ export function createRadialTexture(stops) {
   return texture;
 }
 
-export function createReflectionStreakTexture(colorA = '#ff2d95', colorB = '#64f6ff') {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 1024;
-  const context = canvas.getContext('2d');
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  const random = seededRandom(444);
-
-  for (let i = 0; i < 42; i += 1) {
-    const x = 20 + random() * 216;
-    const width = 1 + random() * 12;
-    const y = random() * 860;
-    const length = 30 + random() * 165;
-    const gradient = context.createLinearGradient(0, y, 0, y + length);
-    const color = i % 3 === 0 ? colorB : colorA;
-    gradient.addColorStop(0, 'transparent');
-    gradient.addColorStop(0.25, color);
-    gradient.addColorStop(0.72, color);
-    gradient.addColorStop(1, 'transparent');
-    context.globalAlpha = 0.04 + random() * 0.16;
-    context.fillStyle = gradient;
-    context.fillRect(x, y, width, length);
-  }
-
-  context.globalAlpha = 1;
-  const texture = textureFromCanvas(canvas);
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  return texture;
-}
-
 export function createNeonEnvironment(renderer) {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
