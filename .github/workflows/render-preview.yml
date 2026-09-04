@@ -1,0 +1,82 @@
+name: Render visual previews
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build visual target
+        run: npm run build
+
+      - name: Capture WebGL views
+        shell: bash
+        run: |
+          set -euo pipefail
+          chrome_bin="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          test -n "$chrome_bin"
+          "$chrome_bin" --version
+
+          mkdir -p render-captures
+          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/3jpunk-vite-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/ > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          capture_view() {
+            local view="$1"
+            "$chrome_bin" \
+              --headless=new \
+              --no-sandbox \
+              --disable-dev-shm-usage \
+              --hide-scrollbars \
+              --enable-webgl \
+              --ignore-gpu-blocklist \
+              --enable-unsafe-swiftshader \
+              --use-gl=angle \
+              --use-angle=swiftshader \
+              --force-device-scale-factor=1 \
+              --window-size=1440,900 \
+              --virtual-time-budget=12000 \
+              --screenshot="render-captures/${view}.png" \
+              "http://127.0.0.1:4173/?capture=${view}"
+          }
+
+          capture_view street
+          capture_view bridge
+          capture_view alley
+
+          file render-captures/*.png
+
+      - name: Upload visual previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3jpunk-render-previews
+          path: render-captures/*.png
+          if-no-files-found: error
+          retention-days: 14
