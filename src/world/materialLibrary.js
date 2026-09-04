@@ -75,9 +75,9 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
       ...asphalt,
       color: 0x6b7072,
       bumpScale: 0.06,
-      roughness: 0.25,
-      metalness: 0.14,
-      envMapIntensity: 1.35,
+      roughness: 0.32,
+      metalness: 0.08,
+      envMapIntensity: 1.2,
     }),
     sidewalk: new THREE.MeshStandardMaterial({
       ...sidewalk,

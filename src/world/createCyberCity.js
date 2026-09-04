@@ -117,11 +117,11 @@ function addSky(scene) {
 }
 
 function addLighting(scene, isQuest) {
-  const hemisphere = new THREE.HemisphereLight(0x98acb0, 0x211815, 1.05);
+  const hemisphere = new THREE.HemisphereLight(0x98acb0, 0x211815, 1.15);
   hemisphere.name = 'OVERCAST_AMBIENT';
   scene.add(hemisphere);
 
-  const cityBounce = new THREE.AmbientLight(0x71888b, 0.62);
+  const cityBounce = new THREE.AmbientLight(0x71888b, 0.82);
   cityBounce.name = 'CITY_SKY_BOUNCE';
   scene.add(cityBounce);
 
@@ -303,7 +303,7 @@ function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
   root.add(sprite);
   const hasRealLight = isQuest ? [1, 4, 5].includes(index) : index % 2 === 0 || index === 5;
   if (hasRealLight) {
-    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 22 : 32, 9.5, 2.2);
+    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 14 : 20, 9.5, 2.2);
     light.position.copy(sprite.position);
     root.add(light);
   }
