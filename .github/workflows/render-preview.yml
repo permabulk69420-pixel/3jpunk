@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: visual-preview
+  cancel-in-progress: true
+
 jobs:
   capture:
     runs-on: ubuntu-latest
@@ -62,7 +66,7 @@ jobs:
               --use-angle=swiftshader \
               --force-device-scale-factor=1 \
               --window-size=1440,900 \
-              --virtual-time-budget=12000 \
+              --virtual-time-budget=1200 \
               --screenshot="render-captures/${view}.png" \
               "http://127.0.0.1:4173/?capture=${view}"
           }
