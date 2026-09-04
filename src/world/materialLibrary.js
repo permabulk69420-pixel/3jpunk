@@ -7,6 +7,12 @@ const TEXTURES = {
   facadeIndustrial: {
     color: new URL('../assets/materials/facade-industrial.webp', import.meta.url).href,
   },
+  facadeCapsule: {
+    color: new URL('../assets/materials/facade-capsule-hotel.webp', import.meta.url).href,
+  },
+  facadeRepair: {
+    color: new URL('../assets/materials/facade-repair-works.webp', import.meta.url).href,
+  },
   wardwatch: {
     color: new URL('../assets/materials/wardwatch-billboard.webp', import.meta.url).href,
   },
@@ -58,6 +64,8 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const shutter = surfacePair(loader, renderer, 'shutter', [1.2, 1.4], isQuest);
   const facadeMixed = loadTexture(loader, renderer, TEXTURES.facadeMixed.color, [1, 1], true, isQuest);
   const facadeIndustrial = loadTexture(loader, renderer, TEXTURES.facadeIndustrial.color, [1, 1], true, isQuest);
+  const facadeCapsule = loadTexture(loader, renderer, TEXTURES.facadeCapsule.color, [1, 1], true, isQuest);
+  const facadeRepair = loadTexture(loader, renderer, TEXTURES.facadeRepair.color, [1, 1], true, isQuest);
   const wardwatch = loadTexture(loader, renderer, TEXTURES.wardwatch.color, [1, 1], true, isQuest);
   wardwatch.wrapS = THREE.ClampToEdgeWrapping;
   wardwatch.wrapT = THREE.ClampToEdgeWrapping;
@@ -86,13 +94,28 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
       metalness: 0.12,
       envMapIntensity: 0.78,
     }),
+    facadeCapsule: new THREE.MeshStandardMaterial({
+      map: facadeCapsule,
+      color: 0xffffff,
+      roughness: 0.58,
+      metalness: 0.14,
+      envMapIntensity: 0.88,
+    }),
+    facadeRepair: new THREE.MeshStandardMaterial({
+      map: facadeRepair,
+      color: 0xffffff,
+      roughness: 0.7,
+      metalness: 0.08,
+      envMapIntensity: 0.7,
+    }),
     road: new THREE.MeshStandardMaterial({
       ...asphalt,
+      roughnessMap: asphalt.bumpMap,
       color: 0x6b7072,
       bumpScale: 0.06,
-      roughness: 0.32,
-      metalness: 0.08,
-      envMapIntensity: 1.2,
+      roughness: 0.76,
+      metalness: 0.02,
+      envMapIntensity: 1.35,
     }),
     sidewalk: new THREE.MeshStandardMaterial({
       ...sidewalk,

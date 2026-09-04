@@ -413,7 +413,13 @@ export class BuildingFactory {
     facade.receiveShadow = true;
     group.add(facade);
 
-    const ledges = [0.255, 0.5, 0.745]
+    const ledgeProfiles = {
+      apartments: [0.255, 0.5, 0.745],
+      tenement: [0.2, 0.39, 0.58, 0.77],
+      workshop: [0.34, 0.67],
+      capsules: [0.205, 0.405, 0.605, 0.805],
+    };
+    const ledges = (ledgeProfiles[definition.profile] || ledgeProfiles.apartments)
       .map((ratio) => ratio * facadeHeight)
       .filter((y) => y > 5.5 && y < facadeHeight - 1.2)
       .map((y) => ({
@@ -421,6 +427,24 @@ export class BuildingFactory {
         position: [facadeX + direction * 0.08, y, 0],
       }));
     addInstancedBoxes(group, this.boxGeometry, this.materials.paintedMetal, ledges, `${definition.id}__facade-ledges`);
+
+    const structuralRibs = [];
+    if (definition.profile === 'workshop') {
+      for (const ratio of [-0.34, 0.02, 0.37]) {
+        structuralRibs.push({
+          size: [0.3, facadeHeight - 5.4, 0.24],
+          position: [facadeX + direction * 0.16, (facadeHeight + 5.4) * 0.5, ratio * depth],
+        });
+      }
+    } else if (definition.profile === 'capsules') {
+      for (const ratio of [-0.27, 0, 0.29]) {
+        structuralRibs.push({
+          size: [0.25, facadeHeight - 5.2, ratio === 0 ? 0.42 : 0.18],
+          position: [facadeX + direction * 0.15, (facadeHeight + 5.2) * 0.5, ratio * depth],
+        });
+      }
+    }
+    addInstancedBoxes(group, this.boxGeometry, this.materials.metal, structuralRibs, `${definition.id}__profile-ribs`);
   }
 
   #createBalconies(group, definition, random) {
@@ -659,28 +683,91 @@ export class BuildingFactory {
   #createRoof(group, definition, wallMaterial, random) {
     const [width, height, depth] = definition.size;
     addBox(group, this.boxGeometry, this.materials.concreteDark, [width + 0.45, 0.72, depth + 0.45], [0, height + 0.35, 0], { castShadow: true });
-    addBox(group, this.boxGeometry, this.materials.metal, [width * 0.58, 2.2, depth * 0.26], [definition.side * 0.8, height + 1.45, -depth * 0.2], { castShadow: true });
 
-    const tankZ = depth * 0.18;
-    addCylinder(
-      group,
-      this.cylinder20,
-      this.materials.paintedMetal,
-      [definition.side * 0.7, height + 2.1, tankZ],
-      { scale: [1.55, 3.2, 1.55], castShadow: true },
-    );
-    for (let y = height + 0.9; y <= height + 3.1; y += 0.55) {
-      addCylinder(group, this.cylinder20, this.materials.blackMetal, [definition.side * 0.7, y, tankZ], { scale: [1.62, 0.06, 1.62] });
-    }
-    const legs = [];
-    for (const x of [-0.85, 0.85]) {
-      for (const z of [-0.85, 0.85]) {
-        legs.push({ size: [0.12, 1.6, 0.12], position: [definition.side * 0.7 + x, height + 0.1, tankZ + z] });
+    if (definition.profile === 'apartments') {
+      addBox(group, this.boxGeometry, wallMaterial, [width * 0.62, 2.4, depth * 0.24], [definition.side * 0.65, height + 1.55, -depth * 0.2], { castShadow: true });
+      const tankZ = depth * 0.18;
+      addCylinder(
+        group,
+        this.cylinder20,
+        this.materials.paintedMetal,
+        [definition.side * 0.7, height + 2.1, tankZ],
+        { scale: [1.55, 3.2, 1.55], castShadow: true },
+      );
+      for (let y = height + 0.9; y <= height + 3.1; y += 0.55) {
+        addCylinder(group, this.cylinder20, this.materials.blackMetal, [definition.side * 0.7, y, tankZ], { scale: [1.62, 0.06, 1.62] });
       }
+      const legs = [];
+      for (const x of [-0.85, 0.85]) {
+        for (const z of [-0.85, 0.85]) {
+          legs.push({ size: [0.12, 1.6, 0.12], position: [definition.side * 0.7 + x, height + 0.1, tankZ + z] });
+        }
+      }
+      addInstancedBoxes(group, this.boxGeometry, this.materials.blackMetal, legs, `${definition.id}__tank-legs`);
+    } else if (definition.profile === 'tenement') {
+      addBox(group, this.boxGeometry, wallMaterial, [width * 0.72, 2.8, depth * 0.2], [-definition.side * 0.55, height + 1.75, -depth * 0.17], { castShadow: true });
+      for (const z of [-depth * 0.12, depth * 0.17]) {
+        addCylinder(
+          group,
+          this.cylinder16,
+          this.materials.paintedMetal,
+          [definition.side * 0.8, height + 1.55, z],
+          { scale: [0.86, 1.5, 0.86], rotation: [Math.PI / 2, 0, 0], castShadow: true },
+        );
+        addBox(group, this.boxGeometry, this.materials.blackMetal, [2.15, 0.12, 3.0], [definition.side * 0.8, height + 0.68, z]);
+      }
+      for (const x of [-2.8, 0, 2.8]) {
+        addBox(group, this.boxGeometry, this.materials.metal, [0.08, 2.2, 5.4], [x, height + 1.45, depth * 0.31]);
+      }
+    } else if (definition.profile === 'workshop') {
+      addBox(group, this.boxGeometry, this.materials.metal, [width * 0.84, 3.4, depth * 0.3], [definition.side * 0.35, height + 2.05, -depth * 0.15], { castShadow: true });
+      addCylinder(
+        group,
+        this.cylinder16,
+        this.materials.copper,
+        [definition.side * 2.35, height + 4.0, depth * 0.2],
+        { scale: [0.78, 3.7, 0.78], castShadow: true },
+      );
+      addCylinder(group, this.cylinder16, this.materials.blackMetal, [definition.side * 2.35, height + 7.65, depth * 0.2], { scale: [0.98, 0.16, 0.98] });
+      addCylinder(
+        group,
+        this.cylinder12,
+        this.materials.paintedMetal,
+        [-definition.side * 1.7, height + 2.8, depth * 0.1],
+        { scale: [0.38, 2.5, 0.38] },
+      );
+      for (let index = 0; index < 3; index += 1) {
+        addBox(
+          group,
+          this.boxGeometry,
+          index % 2 ? this.materials.paintedMetal : this.materials.blackMetal,
+          [width * 0.72, 1.15, 2.3],
+          [0, height + 1.05 + index * 0.34, -depth * 0.34 + index * 3.25],
+          { rotation: [0, 0, definition.side * 0.16] },
+        );
+      }
+    } else {
+      addBox(group, this.boxGeometry, this.materials.paintedMetal, [width * 0.56, 4.8, depth * 0.24], [definition.side * 0.8, height + 2.75, -depth * 0.17], { castShadow: true });
+      addBox(group, this.boxGeometry, this.materials.blackMetal, [width * 0.38, 2.9, depth * 0.17], [-definition.side * 1.1, height + 1.8, depth * 0.19], { castShadow: true });
+      const antenna = addCylinder(
+        group,
+        this.torus,
+        this.materials.metal,
+        [-definition.side * (width * 0.28), height + 5.8, depth * 0.13],
+        { scale: [1.65, 1.65, 1.65], rotation: [0, Math.PI / 2, 0] },
+      );
+      antenna.name = `${definition.id}__roof-array`;
+      addCylinder(
+        group,
+        this.cylinder8,
+        this.materials.copper,
+        [-definition.side * (width * 0.28), height + 4.5, depth * 0.13],
+        { scale: [0.08, 4.5, 0.08] },
+      );
     }
-    addInstancedBoxes(group, this.boxGeometry, this.materials.blackMetal, legs, `${definition.id}__tank-legs`);
 
-    for (let index = 0; index < 4; index += 1) {
+    const utilityCount = definition.profile === 'workshop' ? 2 : 3;
+    for (let index = 0; index < utilityCount; index += 1) {
       const z = -depth * 0.28 + index * depth * 0.18;
       addBox(
         group,
@@ -691,22 +778,24 @@ export class BuildingFactory {
       );
     }
 
-    const mastHeight = 5.5 + random() * 4.5;
-    addCylinder(
-      group,
-      this.cylinder8,
-      this.materials.metal,
-      [definition.side * 1.8, height + mastHeight / 2 + 0.5, -depth * 0.05],
-      { scale: [0.075, mastHeight, 0.075] },
-    );
-    for (let index = 0; index < 3; index += 1) {
-      addBox(
+    if (definition.profile === 'apartments' || definition.profile === 'capsules') {
+      const mastHeight = 5.5 + random() * 4.5;
+      addCylinder(
         group,
-        this.boxGeometry,
-        index === 1 ? wallMaterial : this.materials.metal,
-        [2.4 - index * 0.36, 0.06, 0.06],
-        [definition.side * 1.8, height + 2.7 + index * 0.72, -depth * 0.05],
+        this.cylinder8,
+        this.materials.metal,
+        [definition.side * 1.8, height + mastHeight / 2 + 0.5, -depth * 0.05],
+        { scale: [0.075, mastHeight, 0.075] },
       );
+      for (let index = 0; index < 3; index += 1) {
+        addBox(
+          group,
+          this.boxGeometry,
+          index === 1 ? wallMaterial : this.materials.metal,
+          [2.4 - index * 0.36, 0.06, 0.06],
+          [definition.side * 1.8, height + 2.7 + index * 0.72, -depth * 0.05],
+        );
+      }
     }
   }
 }

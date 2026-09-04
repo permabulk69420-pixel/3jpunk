@@ -69,7 +69,7 @@ export class AtmosphereSystem {
       toneMapped: false,
     });
     const geometry = new THREE.PlaneGeometry(1, 1);
-    this.rippleCount = this.isQuest ? 12 : 24;
+    this.rippleCount = this.isQuest ? 16 : 28;
     this.ripples = new THREE.InstancedMesh(geometry, material, this.rippleCount);
     this.ripples.name = 'RAIN_RIPPLES';
     this.ripples.frustumCulled = false;
@@ -78,8 +78,8 @@ export class AtmosphereSystem {
 
     for (let index = 0; index < this.rippleCount; index += 1) {
       this.rippleState.push({
-        x: (this.random() - 0.5) * 20,
-        z: (this.random() - 0.5) * 82,
+        x: (this.random() - 0.5) * 11.4,
+        z: -3 - this.random() * 24,
         phase: this.random(),
         speed: 0.42 + this.random() * 0.85,
       });
@@ -155,7 +155,10 @@ export class AtmosphereSystem {
     this.rippleState.forEach((state, index) => {
       const cycle = (elapsedSeconds * state.speed + state.phase) % 1;
       const size = 0.08 + cycle * 0.68;
-      _position.set(state.x, 0.027, state.z);
+      let rippleZ = focusZ + state.z;
+      if (rippleZ < -51) rippleZ += 100;
+      if (rippleZ > 51) rippleZ -= 100;
+      _position.set(THREE.MathUtils.clamp(focusX + state.x, -6.1, 6.1), 0.038, rippleZ);
       _scale.set(size, size, size);
       _matrix.compose(_position, _rotation, _scale);
       this.ripples.setMatrixAt(index, _matrix);

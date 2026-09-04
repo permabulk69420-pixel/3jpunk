@@ -18,6 +18,8 @@ The first slice is **Rain District 03**: one dense city block, four distinct bui
 
 The WebXR session requests `local-floor` with optional bounded-floor and hand-tracking support. The world uses metres, +Y up and -Z forward.
 
+The repeatable image-generation, WebP conversion, material and screenshot-QA process is documented in [Image-to-game asset workflow](docs/IMAGE-ASSET-WORKFLOW.md).
+
 ## Run locally
 
 ```bash

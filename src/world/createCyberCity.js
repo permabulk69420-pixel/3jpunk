@@ -11,8 +11,6 @@ const UNIT_CYLINDER_8 = new THREE.CylinderGeometry(1, 1, 1, 8);
 const UNIT_CYLINDER_16 = new THREE.CylinderGeometry(1, 1, 1, 16);
 const UNIT_CYLINDER_32 = new THREE.CylinderGeometry(1, 1, 1, 32);
 const UNIT_PLANE = new THREE.PlaneGeometry(1, 1);
-const UNIT_CIRCLE_14 = new THREE.CircleGeometry(1, 14);
-const UNIT_CIRCLE_20 = new THREE.CircleGeometry(1, 20);
 
 function addBox(parent, material, size, position, options = {}) {
   const mesh = new THREE.Mesh(UNIT_BOX, material);
@@ -141,10 +139,6 @@ function addLighting(scene, isQuest) {
   moon.shadow.normalBias = 0.025;
   scene.add(moon, moon.target);
 
-  const distantWarmth = new THREE.DirectionalLight(0xd17754, 0.17);
-  distantWarmth.position.set(18, 12, -60);
-  distantWarmth.target.position.set(0, 4, 18);
-  scene.add(distantWarmth, distantWarmth.target);
 }
 
 function addRoad(root, materials) {
@@ -207,18 +201,7 @@ function addRoad(root, materials) {
     root.add(stripe);
   }
 
-  const patchMaterial = materials.road.clone();
-  patchMaterial.color.set(0x4b4e4d);
-  patchMaterial.roughness = 0.48;
   const random = seededRandom(21903);
-  for (let index = 0; index < 13; index += 1) {
-    const patch = new THREE.Mesh(UNIT_CIRCLE_14, patchMaterial);
-    patch.rotation.x = -Math.PI / 2;
-    patch.rotation.z = random() * Math.PI;
-    patch.scale.set(0.45 + random() * 1.25, 0.16 + random() * 0.48, 1);
-    patch.position.set((random() - 0.5) * 9.8, 0.028, -50 + random() * 100);
-    root.add(patch);
-  }
 
   const crackMaterial = new THREE.LineBasicMaterial({ color: 0x111413 });
   const crackSegments = [];
@@ -232,21 +215,6 @@ function addRoad(root, materials) {
     for (let step = 0; step < points.length - 1; step += 1) crackSegments.push(points[step], points[step + 1]);
   }
   root.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(crackSegments), crackMaterial));
-
-  const puddleMaterial = new THREE.MeshStandardMaterial({
-    color: 0x202b2d,
-    roughness: 0.08,
-    metalness: 0.28,
-    envMapIntensity: 1.8,
-  });
-  for (let index = 0; index < 22; index += 1) {
-    const puddle = new THREE.Mesh(UNIT_CIRCLE_20, puddleMaterial);
-    puddle.rotation.x = -Math.PI / 2;
-    puddle.rotation.z = random() * Math.PI;
-    puddle.scale.set(0.35 + random() * 1.7, 0.15 + random() * 0.52, 1);
-    puddle.position.set((random() - 0.5) * 11.7, 0.052, -50 + random() * 100);
-    root.add(puddle);
-  }
 
 }
 
@@ -573,7 +541,7 @@ export function createCyberCity({ scene, renderer, isQuest = false }) {
   addDistantCity(root, materials);
   batchStaticMeshes(
     root,
-    [UNIT_BOX, UNIT_CYLINDER_8, UNIT_CYLINDER_16, UNIT_CYLINDER_32, UNIT_PLANE, UNIT_CIRCLE_14, UNIT_CIRCLE_20],
+    [UNIT_BOX, UNIT_CYLINDER_8, UNIT_CYLINDER_16, UNIT_CYLINDER_32, UNIT_PLANE],
     { prefix: 'district__batch' },
   );
 
