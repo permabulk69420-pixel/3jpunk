@@ -34,6 +34,17 @@ function addCylinder(parent, geometry, material, scale, position, rotation = nul
   return mesh;
 }
 
+function addStreetFacingPanel(parent, material, size, position, side, name = '') {
+  const mesh = new THREE.Mesh(UNIT_PLANE, material);
+  mesh.scale.set(size[0], size[1], 1);
+  mesh.position.set(...position);
+  mesh.rotation.y = -side * Math.PI / 2;
+  mesh.receiveShadow = true;
+  if (name) mesh.name = name;
+  parent.add(mesh);
+  return mesh;
+}
+
 function createWayfindingTexture(sign) {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -244,30 +255,30 @@ function addRoadHardware(root, materials) {
   }
 }
 
-function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
+function addLamp(root, materials, side, z, index, glowTexture, lampMaterials, isQuest) {
   const x = side * 9.45;
-  addCylinder(root, UNIT_CYLINDER_8, materials.blackMetal, [0.11, 5.35, 0.11], [x, 2.72, z]);
-  addBox(root, materials.metal, [1.65, 0.1, 0.11], [x - side * 0.76, 5.22, z], { rotation: [0, 0, side * -0.08] });
-  addBox(root, materials.blackMetal, [0.78, 0.24, 0.42], [x - side * 1.58, 5.06, z], { castShadow: true });
+  addCylinder(root, UNIT_CYLINDER_16, materials.blackMetal, [0.24, 0.11, 0.24], [x, 0.15, z]);
+  addCylinder(root, UNIT_CYLINDER_16, materials.metal, [0.15, 0.42, 0.15], [x, 0.42, z]);
+  addCylinder(root, UNIT_CYLINDER_16, materials.blackMetal, [0.09, 4.82, 0.09], [x, 2.82, z]);
+  addBox(root, materials.paintedMetal, [0.035, 0.5, 0.24], [x - side * 0.105, 1.1, z]);
+  addBox(root, materials.metal, [1.78, 0.1, 0.11], [x - side * 0.81, 5.2, z], { rotation: [0, 0, side * -0.075] });
+  addBox(root, materials.metal, [1.02, 0.065, 0.075], [x - side * 0.52, 4.91, z], { rotation: [0, 0, side * -0.36] });
+  addBox(root, materials.blackMetal, [0.9, 0.2, 0.5], [x - side * 1.68, 5.02, z], { castShadow: true });
+  addBox(root, materials.paintedMetal, [0.68, 0.08, 0.38], [x - side * 1.68, 4.91, z]);
   const lampColor = index % 4 === 3 ? 0xa8d0cb : 0xffb16e;
-  const emissive = new THREE.MeshStandardMaterial({
-    color: lampColor,
-    emissive: lampColor,
-    emissiveIntensity: 2.2,
-    roughness: 0.32,
-  });
-  addBox(root, emissive, [0.56, 0.055, 0.27], [x - side * 1.58, 4.91, z]);
+  const emissive = index % 4 === 3 ? lampMaterials.cool : lampMaterials.warm;
+  addBox(root, emissive, [0.52, 0.045, 0.25], [x - side * 1.68, 4.855, z]);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: glowTexture,
     color: lampColor,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.22,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     toneMapped: false,
   }));
-  sprite.position.set(x - side * 1.58, 4.83, z);
-  sprite.scale.set(2.1, 2.1, 1);
+  sprite.position.set(x - side * 1.68, 4.8, z);
+  sprite.scale.set(1.65, 1.65, 1);
   root.add(sprite);
   // Quest keeps the visible emissive bulb and halo, but avoids dynamic point-light
   // specular streaks that make ordinary wet surfaces read as self-illuminated.
@@ -286,17 +297,43 @@ function addStreetFurniture(root, materials, isQuest) {
     [0.3, 'rgba(255,190,120,.18)'],
     [1, 'rgba(0,0,0,0)'],
   ]);
+  const lampMaterials = {
+    warm: new THREE.MeshStandardMaterial({
+      color: 0x5e4937,
+      emissive: 0xffb16e,
+      emissiveIntensity: 1.85,
+      roughness: 0.32,
+    }),
+    cool: new THREE.MeshStandardMaterial({
+      color: 0x3c5654,
+      emissive: 0xa8d0cb,
+      emissiveIntensity: 1.55,
+      roughness: 0.3,
+    }),
+  };
+  const serviceIndicator = new THREE.MeshStandardMaterial({
+    color: 0x39271a,
+    emissive: 0xe68a35,
+    emissiveIntensity: 1.25,
+    roughness: 0.4,
+  });
   const lampPositions = [-43, -27, -10, 8, 25, 42];
   lampPositions.forEach((z, index) => {
     const side = index % 2 === 0 ? -1 : 1;
-    addLamp(root, materials, side, z, index, glowTexture, isQuest);
+    addLamp(root, materials, side, z, index, glowTexture, lampMaterials, isQuest);
   });
 
   for (const side of [-1, 1]) {
-    for (let z = -44; z <= 44; z += 8.8) {
-      addCylinder(root, UNIT_CYLINDER_8, materials.paintedMetal, [0.095, 0.82, 0.095], [side * 7.0, 0.49, z]);
-      addCylinder(root, UNIT_CYLINDER_8, materials.blackMetal, [0.13, 0.08, 0.13], [side * 7.0, 0.89, z]);
-    }
+    const bollardPositions = side < 0
+      ? [-44, -32, -20, -8, 4, 16, 28, 40]
+      : [-39, -27, -15, -3, 9, 21, 33, 45];
+    bollardPositions.forEach((z) => {
+      const x = side * 7.0;
+      addCylinder(root, UNIT_CYLINDER_16, materials.blackMetal, [0.17, 0.08, 0.17], [x, 0.16, z]);
+      addCylinder(root, UNIT_CYLINDER_16, materials.paintedMetal, [0.095, 0.7, 0.095], [x, 0.53, z]);
+      addCylinder(root, UNIT_CYLINDER_16, materials.curb, [0.118, 0.055, 0.118], [x, 0.76, z]);
+      addCylinder(root, UNIT_CYLINDER_16, materials.blackMetal, [0.135, 0.075, 0.135], [x, 0.9, z]);
+    });
   }
 
   const propData = [
@@ -304,44 +341,75 @@ function addStreetFurniture(root, materials, isQuest) {
     [-10.2, -33, 'cabinet'], [10.15, -42, 'crate'], [-9.95, -7, 'cabinet'],
   ];
   propData.forEach(([x, z, type], index) => {
+    const side = Math.sign(x);
+    const frontX = x - side;
     if (type === 'bin') {
-      addBox(root, materials.paintedMetal, [0.9, 1.2, 0.95], [x, 0.72, z], { castShadow: true });
-      addBox(root, materials.blackMetal, [0.98, 0.12, 1.02], [x, 1.36, z], { rotation: [0, 0, index % 2 ? 0.04 : -0.04] });
+      addBox(root, materials.paintedMetal, [0.92, 1.18, 1.04], [x, 0.75, z], { castShadow: true });
+      addBox(root, materials.blackMetal, [1.04, 0.15, 1.16], [x, 1.4, z], {
+        rotation: [0, 0, side * (index % 2 ? 0.045 : -0.035)],
+      });
+      addBox(root, materials.blackMetal, [0.055, 0.22, 0.62], [frontX + side * 0.505, 1.08, z]);
+      for (const railZ of [-0.37, 0.37]) {
+        addBox(root, materials.metal, [0.06, 0.48, 0.055], [frontX + side * 0.49, 1.03, z + railZ]);
+        addBox(root, materials.blackMetal, [0.08, 0.08, 0.19], [x, 1.31, z + railZ]);
+      }
+      addBox(root, materials.blackMetal, [1.0, 0.1, 1.1], [x, 0.2, z]);
       for (const wheel of [-0.3, 0.3]) {
-        addCylinder(root, UNIT_CYLINDER_16, materials.rubber, [0.12, 0.08, 0.12], [x + 0.46 * Math.sign(x), 0.2, z + wheel], [0, 0, Math.PI / 2]);
+        addCylinder(root, UNIT_CYLINDER_16, materials.rubber, [0.13, 0.09, 0.13], [x + side * 0.46, 0.16, z + wheel], [0, 0, Math.PI / 2]);
       }
     } else if (type === 'cabinet') {
-      addBox(root, materials.metal, [0.58, 1.55, 1.18], [x, 0.9, z], { castShadow: true });
-      addBox(root, materials.blackMetal, [0.08, 1.24, 0.88], [x - Math.sign(x) * 0.33, 0.94, z]);
-      for (let y = 0.48; y <= 1.35; y += 0.22) {
-        addBox(root, materials.paintedMetal, [0.07, 0.055, 0.68], [x - Math.sign(x) * 0.39, y, z]);
+      addBox(root, materials.metal, [0.72, 1.82, 1.28], [x, 1.05, z], { castShadow: true });
+      addBox(root, materials.blackMetal, [0.84, 0.1, 1.4], [x, 2.0, z]);
+      addBox(root, materials.blackMetal, [0.82, 0.12, 1.34], [x, 0.17, z]);
+      const panelX = x - side * 0.426;
+      addStreetFacingPanel(root, materials.municipalService, [1.06, 1.5], [panelX, 1.1, z], side, 'MUNICIPAL_SERVICE_PANEL');
+      for (const railZ of [-0.59, 0.59]) {
+        addBox(root, materials.blackMetal, [0.07, 1.64, 0.055], [x - side * 0.4, 1.1, z + railZ]);
       }
+      addBox(root, serviceIndicator, [0.035, 0.055, 0.11], [x - side * 0.448, 1.72, z + 0.44]);
+      addCylinder(root, UNIT_CYLINDER_16, materials.copper, [0.035, 0.9, 0.035], [x + side * 0.27, 2.46, z + 0.43]);
     } else {
-      addBox(root, materials.concreteDark, [0.72, 0.62, 1.1], [x, 0.44, z], { castShadow: true });
-      addBox(root, materials.paintedMetal, [0.76, 0.05, 1.14], [x, 0.77, z]);
-      addBox(root, materials.blackMetal, [0.04, 0.64, 1.15], [x - Math.sign(x) * 0.39, 0.46, z]);
+      addBox(root, materials.concreteDark, [0.78, 0.66, 1.16], [x, 0.48, z], { castShadow: true });
+      addBox(root, materials.paintedMetal, [0.84, 0.1, 1.22], [x, 0.86, z]);
+      const caseFrontX = x - side * 0.415;
+      addBox(root, materials.paintedMetal, [0.055, 0.56, 1.02], [caseFrontX, 0.49, z]);
+      for (const railZ of [-0.5, 0.5]) {
+        addBox(root, materials.blackMetal, [0.07, 0.62, 0.075], [caseFrontX - side * 0.015, 0.5, z + railZ]);
+      }
+      for (const railY of [0.29, 0.68]) {
+        addBox(root, materials.blackMetal, [0.07, 0.06, 0.9], [caseFrontX - side * 0.018, railY, z]);
+      }
+      for (const latchZ of [-0.23, 0.23]) {
+        addBox(root, materials.metal, [0.075, 0.13, 0.11], [caseFrontX - side * 0.025, 0.61, z + latchZ]);
+      }
+      addBox(root, materials.blackMetal, [0.38, 0.06, 0.08], [x, 0.94, z]);
     }
   });
 }
 
-function addVendingMachine(root, materials, side, z, color) {
+function addVendingMachine(root, materials, side, z, kind, color) {
   const x = side * 10.25;
-  const body = new THREE.Group();
-  body.position.set(x, 1.18, z);
-  addBox(body, materials.paintedMetal, [0.8, 2.36, 1.18], [0, 0, 0], { castShadow: true });
-  const lightMaterial = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color).multiplyScalar(0.5),
-    emissive: color,
-    emissiveIntensity: 1.15,
-    roughness: 0.25,
-  });
-  addBox(body, lightMaterial, [0.055, 1.25, 0.84], [-side * 0.43, 0.32, 0]);
-  addBox(body, materials.darkGlass, [0.06, 0.72, 0.62], [-side * 0.47, 0.5, 0]);
-  for (let row = -0.18; row <= 0.72; row += 0.3) {
-    addBox(body, materials.blackMetal, [0.065, 0.035, 0.62], [-side * 0.5, row, 0]);
+  addBox(root, materials.paintedMetal, [0.94, 2.68, 1.42], [x, 1.4, z], { castShadow: true });
+  addBox(root, materials.blackMetal, [1.08, 0.13, 1.54], [x, 2.79, z]);
+  addBox(root, materials.blackMetal, [1.02, 0.16, 1.48], [x, 0.16, z]);
+  for (const railZ of [-0.69, 0.69]) {
+    addBox(root, materials.blackMetal, [1.02, 2.48, 0.07], [x, 1.46, z + railZ]);
   }
-  addBox(body, materials.blackMetal, [0.08, 0.28, 0.55], [-side * 0.48, -0.76, 0]);
-  root.add(body);
+  for (const footZ of [-0.43, 0.43]) {
+    addBox(root, materials.rubber, [0.62, 0.12, 0.18], [x + side * 0.08, 0.065, z + footZ]);
+  }
+
+  const panelX = x - side * 0.526;
+  const panelMaterial = kind === 'essentials' ? materials.vendingEssentials : materials.vendingDrinks;
+  addStreetFacingPanel(root, panelMaterial, [1.22, 2.42], [panelX, 1.46, z], side, `VENDING_${kind.toUpperCase()}_FRONT`);
+
+  const indicator = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(color).multiplyScalar(0.28),
+    emissive: color,
+    emissiveIntensity: 1.3,
+    roughness: 0.34,
+  });
+  addBox(root, indicator, [0.032, 0.045, 0.14], [x - side * 0.548, 2.2, z + 0.47]);
 }
 
 function addSideAlleys(root, materials) {
@@ -530,9 +598,9 @@ export function createCyberCity({ scene, renderer, isQuest = false }) {
   addRoad(root, materials);
   addRoadHardware(root, materials);
   addStreetFurniture(root, materials, isQuest);
-  addVendingMachine(root, materials, -1, 28.5, 0x4ca7a3);
-  addVendingMachine(root, materials, 1, 3.7, 0xc26a49);
-  addVendingMachine(root, materials, -1, -21.5, 0xa84c63);
+  addVendingMachine(root, materials, -1, 28.5, 'drinks', 0x4ca7a3);
+  addVendingMachine(root, materials, 1, 3.7, 'essentials', 0xc26a49);
+  addVendingMachine(root, materials, -1, -21.5, 'essentials', 0xa84c63);
   addSideAlleys(root, materials);
   addHeroBillboard(root, materials);
   addSkybridge(root, materials);

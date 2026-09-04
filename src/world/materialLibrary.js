@@ -16,6 +16,15 @@ const TEXTURES = {
   wardwatch: {
     color: new URL('../assets/materials/wardwatch-billboard.webp', import.meta.url).href,
   },
+  vendingDrinks: {
+    color: new URL('../assets/materials/vending-drinks-front.webp', import.meta.url).href,
+  },
+  vendingEssentials: {
+    color: new URL('../assets/materials/vending-essentials-front.webp', import.meta.url).href,
+  },
+  municipalService: {
+    color: new URL('../assets/materials/municipal-service-front.webp', import.meta.url).href,
+  },
   asphalt: {
     color: new URL('../assets/materials/asphalt-albedo.webp', import.meta.url).href,
     height: new URL('../assets/materials/asphalt-height.webp', import.meta.url).href,
@@ -51,6 +60,13 @@ function loadTexture(loader, renderer, url, repeat, colorTexture = false, isQues
   return texture;
 }
 
+function loadClampedTexture(loader, renderer, url, colorTexture, isQuest) {
+  const texture = loadTexture(loader, renderer, url, [1, 1], colorTexture, isQuest);
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
 function surfacePair(loader, renderer, key, repeat, isQuest) {
   return {
     map: loadTexture(loader, renderer, TEXTURES[key].color, repeat, true, isQuest),
@@ -61,9 +77,7 @@ function surfacePair(loader, renderer, key, repeat, isQuest) {
 export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const loader = new THREE.TextureLoader();
   const asphalt = surfacePair(loader, renderer, 'asphalt', [2.2, 17], isQuest);
-  const roadReflections = loadTexture(loader, renderer, TEXTURES.roadReflections.color, [1, 1], true, isQuest);
-  roadReflections.wrapS = THREE.ClampToEdgeWrapping;
-  roadReflections.wrapT = THREE.ClampToEdgeWrapping;
+  const roadReflections = loadClampedTexture(loader, renderer, TEXTURES.roadReflections.color, true, isQuest);
   const sidewalk = surfacePair(loader, renderer, 'sidewalk', [1.5, 19], isQuest);
   const concrete = surfacePair(loader, renderer, 'concrete', [2.2, 5.4], isQuest);
   const brick = surfacePair(loader, renderer, 'brick', [2.7, 5.2], isQuest);
@@ -72,11 +86,33 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const facadeIndustrial = loadTexture(loader, renderer, TEXTURES.facadeIndustrial.color, [1, 1], true, isQuest);
   const facadeCapsule = loadTexture(loader, renderer, TEXTURES.facadeCapsule.color, [1, 1], true, isQuest);
   const facadeRepair = loadTexture(loader, renderer, TEXTURES.facadeRepair.color, [1, 1], true, isQuest);
-  const wardwatch = loadTexture(loader, renderer, TEXTURES.wardwatch.color, [1, 1], true, isQuest);
-  wardwatch.wrapS = THREE.ClampToEdgeWrapping;
-  wardwatch.wrapT = THREE.ClampToEdgeWrapping;
+  const wardwatch = loadClampedTexture(loader, renderer, TEXTURES.wardwatch.color, true, isQuest);
+  const vendingDrinks = loadClampedTexture(loader, renderer, TEXTURES.vendingDrinks.color, true, isQuest);
+  const vendingEssentials = loadClampedTexture(loader, renderer, TEXTURES.vendingEssentials.color, true, isQuest);
+  const municipalService = loadClampedTexture(loader, renderer, TEXTURES.municipalService.color, true, isQuest);
 
   const materials = {
+    vendingDrinks: new THREE.MeshStandardMaterial({
+      map: vendingDrinks,
+      color: 0xffffff,
+      roughness: 0.48,
+      metalness: 0.2,
+      envMapIntensity: 0.82,
+    }),
+    vendingEssentials: new THREE.MeshStandardMaterial({
+      map: vendingEssentials,
+      color: 0xffffff,
+      roughness: 0.52,
+      metalness: 0.17,
+      envMapIntensity: 0.78,
+    }),
+    municipalService: new THREE.MeshStandardMaterial({
+      map: municipalService,
+      color: 0xffffff,
+      roughness: 0.57,
+      metalness: 0.42,
+      envMapIntensity: 0.92,
+    }),
     wardwatchScreen: new THREE.MeshStandardMaterial({
       map: wardwatch,
       emissiveMap: wardwatch,

@@ -6,6 +6,7 @@ const _position = new THREE.Vector3();
 const _rotation = new THREE.Quaternion();
 const _scale = new THREE.Vector3();
 const _euler = new THREE.Euler(-Math.PI / 2, 0, 0);
+const _rainColor = new THREE.Color(0xb7c2bf);
 
 export class AtmosphereSystem {
   constructor(scene, focus, { isQuest = false } = {}) {
@@ -13,8 +14,9 @@ export class AtmosphereSystem {
     this.focus = focus;
     this.isQuest = isQuest;
     this.random = seededRandom(7331);
-    this.dropCount = isQuest ? 280 : 620;
-    this.dropState = new Float32Array(this.dropCount * 4);
+    this.dropCount = isQuest ? 220 : 500;
+    // x, y, z, fall speed, exposure length, optical strength
+    this.dropState = new Float32Array(this.dropCount * 6);
     this.rippleState = [];
     this.#createRain();
     this.#createRipples();
@@ -23,15 +25,19 @@ export class AtmosphereSystem {
 
   #createRain() {
     const positions = new Float32Array(this.dropCount * 6);
+    const colors = new Float32Array(this.dropCount * 6);
     this.rainGeometry = new THREE.BufferGeometry();
-    this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.rainGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     const material = new THREE.LineBasicMaterial({
-      color: 0xb9e9ff,
+      color: 0xffffff,
+      vertexColors: true,
       transparent: true,
-      opacity: 0.28,
-      blending: THREE.AdditiveBlending,
+      opacity: this.isQuest ? 0.22 : 0.25,
+      blending: THREE.NormalBlending,
       depthWrite: false,
-      toneMapped: false,
+      toneMapped: true,
+      fog: true,
     });
     this.rain = new THREE.LineSegments(this.rainGeometry, material);
     this.rain.name = 'RAIN_FIELD';
@@ -41,14 +47,31 @@ export class AtmosphereSystem {
     for (let index = 0; index < this.dropCount; index += 1) {
       this.#resetDrop(index, true);
     }
+    this.rainGeometry.attributes.color.needsUpdate = true;
   }
 
   #resetDrop(index, initial = false) {
-    const offset = index * 4;
-    this.dropState[offset] = (this.random() - 0.5) * 31;
+    const offset = index * 6;
+    this.dropState[offset] = (this.random() - 0.5) * 30;
     this.dropState[offset + 1] = initial ? this.random() * 21 : 17 + this.random() * 5;
-    this.dropState[offset + 2] = (this.random() - 0.5) * 38;
-    this.dropState[offset + 3] = 14 + this.random() * 15;
+    this.dropState[offset + 2] = (this.random() - 0.5) * 36;
+
+    if (initial) {
+      this.dropState[offset + 3] = 11 + this.random() * 11;
+      this.dropState[offset + 4] = (this.isQuest ? 0.11 : 0.14) + this.random() * (this.isQuest ? 0.25 : 0.33);
+      this.dropState[offset + 5] = 0.48 + this.random() * 0.52;
+
+      // A brighter leading bead and a dim trail give each one-pixel line a
+      // water-like exposure falloff without a second pass or additive glow.
+      const strength = this.dropState[offset + 5];
+      const colorOffset = index * 6;
+      this.rainGeometry.attributes.color.array[colorOffset] = _rainColor.r * strength;
+      this.rainGeometry.attributes.color.array[colorOffset + 1] = _rainColor.g * strength;
+      this.rainGeometry.attributes.color.array[colorOffset + 2] = _rainColor.b * strength;
+      this.rainGeometry.attributes.color.array[colorOffset + 3] = _rainColor.r * strength * 0.34;
+      this.rainGeometry.attributes.color.array[colorOffset + 4] = _rainColor.g * strength * 0.34;
+      this.rainGeometry.attributes.color.array[colorOffset + 5] = _rainColor.b * strength * 0.34;
+    }
   }
 
   #createRipples() {
@@ -135,20 +158,21 @@ export class AtmosphereSystem {
     const focusZ = _position.z;
     const positions = this.rainGeometry.attributes.position.array;
     for (let index = 0; index < this.dropCount; index += 1) {
-      const offset = index * 4;
+      const offset = index * 6;
       this.dropState[offset + 1] -= this.dropState[offset + 3] * deltaSeconds;
-      this.dropState[offset] -= deltaSeconds * 1.8;
+      this.dropState[offset] -= deltaSeconds * (0.58 + (index % 7) * 0.055);
       if (this.dropState[offset + 1] < 0.06) this.#resetDrop(index);
       const vertex = index * 6;
       const x = focusX + this.dropState[offset];
       const y = this.dropState[offset + 1];
       const z = focusZ + this.dropState[offset + 2];
+      const length = this.dropState[offset + 4];
       positions[vertex] = x;
       positions[vertex + 1] = y;
       positions[vertex + 2] = z;
-      positions[vertex + 3] = x + 0.085;
-      positions[vertex + 4] = y - 0.78;
-      positions[vertex + 5] = z + 0.04;
+      positions[vertex + 3] = x + length * 0.065;
+      positions[vertex + 4] = y + length;
+      positions[vertex + 5] = z - length * 0.018;
     }
     this.rainGeometry.attributes.position.needsUpdate = true;
 
