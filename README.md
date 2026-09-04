@@ -2,7 +2,7 @@
 
 An expandable WebXR cyberpunk street prototype built for standalone Meta Quest 3.
 
-The first slice is **Rain District 03**: one dense city block, four distinct building shells, wet-road reflections, procedural rain, street steam, skyline depth, a skybridge, neon storefronts and spatially correct smooth locomotion.
+The first slice is **Rain District 03**: one dense city block, four distinct building shells, wet-road reflections, procedural rain, street steam, skyline depth, a service skybridge, detailed storefronts and spatially correct smooth locomotion. The road, paving, masonry and shutter surfaces use project-owned, AI-generated source materials compressed into Quest-friendly WebP textures.
 
 ## Controls
 
@@ -36,19 +36,19 @@ npm run build
 
 Each procedural building is a named, replaceable slot with a `GLB_ANCHOR__<slot-id>` node. The current slots are:
 
-- `kiba-exchange`
-- `vanta-clinic`
-- `parallax-arcade`
-- `synko-hotel`
+- `mori-pharmacy`
+- `kuroda-works`
+- `nami-eatery`
+- `echo-capsules`
 
 At runtime, a future building can be dropped into a slot with:
 
 ```js
-await window.__3JPUNK__.replaceBuilding('kiba-exchange', './models/kiba.glb');
+await window.__3JPUNK__.replaceBuilding('mori-pharmacy', './models/mori.glb');
 ```
 
 Replacement GLBs should use metre scale, +Y up, local -Z forward, positive identity scale and Three.js-compatible PBR materials. `restoreBuilding(slotId)` brings the procedural shell back.
 
 ## Deployment
 
-Every push to `main` builds the Vite project and deploys `dist/` through GitHub Actions to GitHub Pages. HTTPS is required for immersive WebXR outside local development.
+Every push to `main` builds the Vite project and deploys `dist/` through GitHub Actions to GitHub Pages. A separate visual-QA workflow captures fixed street, bridge and alley views in real Chrome/WebGL and stores them as the `3jpunk-render-previews` workflow artifact. HTTPS is required for immersive WebXR outside local development.

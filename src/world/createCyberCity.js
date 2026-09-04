@@ -4,11 +4,15 @@ import { BUILDING_SLOTS, CITY_BOUNDS, STREET_SIGNS } from './cityData.js';
 import { CityAssetRegistry } from './CityAssetRegistry.js';
 import { createMaterialLibrary } from './materialLibrary.js';
 import { createRadialTexture, seededRandom } from './proceduralTextures.js';
+import { batchStaticMeshes } from './batchStaticMeshes.js';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 const UNIT_CYLINDER_8 = new THREE.CylinderGeometry(1, 1, 1, 8);
 const UNIT_CYLINDER_16 = new THREE.CylinderGeometry(1, 1, 1, 16);
 const UNIT_CYLINDER_32 = new THREE.CylinderGeometry(1, 1, 1, 32);
+const UNIT_PLANE = new THREE.PlaneGeometry(1, 1);
+const UNIT_CIRCLE_14 = new THREE.CircleGeometry(1, 14);
+const UNIT_CIRCLE_20 = new THREE.CircleGeometry(1, 20);
 
 function addBox(parent, material, size, position, options = {}) {
   const mesh = new THREE.Mesh(UNIT_BOX, material);
@@ -141,16 +145,16 @@ function addSky(scene) {
 }
 
 function addLighting(scene, isQuest) {
-  const hemisphere = new THREE.HemisphereLight(0x869ca5, 0x17110f, 0.64);
+  const hemisphere = new THREE.HemisphereLight(0x98acb0, 0x211815, 1.05);
   hemisphere.name = 'OVERCAST_AMBIENT';
   scene.add(hemisphere);
 
-  const moon = new THREE.DirectionalLight(0xa8c1c6, 2.15);
+  const moon = new THREE.DirectionalLight(0xb2c7c8, 2.0);
   moon.name = 'MOON_THROUGH_CLOUD';
   moon.position.set(-32, 62, 36);
   moon.target.position.set(0, 5, -18);
-  moon.castShadow = true;
-  moon.shadow.mapSize.set(isQuest ? 1024 : 2048, isQuest ? 1024 : 2048);
+  moon.castShadow = !isQuest;
+  moon.shadow.mapSize.set(1024, 1024);
   moon.shadow.camera.left = -38;
   moon.shadow.camera.right = 38;
   moon.shadow.camera.top = 50;
@@ -161,7 +165,7 @@ function addLighting(scene, isQuest) {
   moon.shadow.normalBias = 0.025;
   scene.add(moon, moon.target);
 
-  const distantWarmth = new THREE.DirectionalLight(0xd17754, 0.24);
+  const distantWarmth = new THREE.DirectionalLight(0xd17754, 0.17);
   distantWarmth.position.set(18, 12, -60);
   distantWarmth.target.position.set(0, 4, 18);
   scene.add(distantWarmth, distantWarmth.target);
@@ -196,34 +200,33 @@ function addRoad(root, materials) {
   }
 
   const markingMaterial = new THREE.MeshStandardMaterial({
-    color: 0xb5aa83,
-    roughness: 0.57,
+    color: 0x77715c,
+    roughness: 0.64,
     metalness: 0.02,
-    transparent: true,
-    opacity: 0.36,
   });
   for (let z = -47; z <= 47; z += 8.4) {
-    const marking = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 3.2), markingMaterial);
+    const marking = new THREE.Mesh(UNIT_PLANE, markingMaterial);
     marking.rotation.x = -Math.PI / 2;
+    marking.scale.set(0.085, 3.2, 1);
     marking.position.set(0, 0.034, z);
     root.add(marking);
   }
   const edgeMarking = markingMaterial.clone();
-  edgeMarking.color.set(0x92958c);
-  edgeMarking.opacity = 0.22;
+  edgeMarking.color.set(0x505653);
   for (const x of [-5.55, 5.55]) {
-    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.075, 108), edgeMarking);
+    const line = new THREE.Mesh(UNIT_PLANE, edgeMarking);
     line.rotation.x = -Math.PI / 2;
+    line.scale.set(0.075, 108, 1);
     line.position.set(x, 0.033, -2);
     root.add(line);
   }
 
   const crossingMaterial = markingMaterial.clone();
-  crossingMaterial.color.set(0xb9b7aa);
-  crossingMaterial.opacity = 0.31;
+  crossingMaterial.color.set(0x74746b);
   for (let x = -5.7; x <= 5.7; x += 1.38) {
-    const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 3.05), crossingMaterial);
+    const stripe = new THREE.Mesh(UNIT_PLANE, crossingMaterial);
     stripe.rotation.x = -Math.PI / 2;
+    stripe.scale.set(0.72, 3.05, 1);
     stripe.position.set(x, 0.036, 46.5);
     root.add(stripe);
   }
@@ -233,7 +236,7 @@ function addRoad(root, materials) {
   patchMaterial.roughness = 0.48;
   const random = seededRandom(21903);
   for (let index = 0; index < 13; index += 1) {
-    const patch = new THREE.Mesh(new THREE.CircleGeometry(1, 14), patchMaterial);
+    const patch = new THREE.Mesh(UNIT_CIRCLE_14, patchMaterial);
     patch.rotation.x = -Math.PI / 2;
     patch.rotation.z = random() * Math.PI;
     patch.scale.set(0.45 + random() * 1.25, 0.16 + random() * 0.48, 1);
@@ -241,7 +244,8 @@ function addRoad(root, materials) {
     root.add(patch);
   }
 
-  const crackMaterial = new THREE.LineBasicMaterial({ color: 0x151817, transparent: true, opacity: 0.58 });
+  const crackMaterial = new THREE.LineBasicMaterial({ color: 0x111413 });
+  const crackSegments = [];
   for (let index = 0; index < 9; index += 1) {
     const startX = (random() - 0.5) * 10;
     const startZ = -48 + random() * 96;
@@ -249,22 +253,18 @@ function addRoad(root, materials) {
     for (let step = 0; step < 7; step += 1) {
       points.push(new THREE.Vector3(startX + (random() - 0.5) * 0.7 + step * 0.11, 0.042, startZ + step * 0.42));
     }
-    root.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), crackMaterial));
+    for (let step = 0; step < points.length - 1; step += 1) crackSegments.push(points[step], points[step + 1]);
   }
+  root.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(crackSegments), crackMaterial));
 
-  const puddleMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x263134,
-    roughness: 0.04,
-    metalness: 0.06,
-    clearcoat: 1,
-    clearcoatRoughness: 0.018,
-    transparent: true,
-    opacity: 0.58,
-    envMapIntensity: 2.4,
-    depthWrite: false,
+  const puddleMaterial = new THREE.MeshStandardMaterial({
+    color: 0x202b2d,
+    roughness: 0.08,
+    metalness: 0.28,
+    envMapIntensity: 1.8,
   });
   for (let index = 0; index < 22; index += 1) {
-    const puddle = new THREE.Mesh(new THREE.CircleGeometry(1, 24), puddleMaterial);
+    const puddle = new THREE.Mesh(UNIT_CIRCLE_20, puddleMaterial);
     puddle.rotation.x = -Math.PI / 2;
     puddle.rotation.z = random() * Math.PI;
     puddle.scale.set(0.35 + random() * 1.7, 0.15 + random() * 0.52, 1);
@@ -284,8 +284,8 @@ function addRoad(root, materials) {
     const material = new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
-      opacity: 0.16,
-      blending: THREE.AdditiveBlending,
+      opacity: 0.11,
+      blending: THREE.NormalBlending,
       depthWrite: false,
       toneMapped: false,
     });
@@ -347,8 +347,9 @@ function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
   sprite.position.set(x - side * 1.58, 4.83, z);
   sprite.scale.set(2.1, 2.1, 1);
   root.add(sprite);
-  if (!isQuest || index % 2 === 0) {
-    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 15 : 22, 10.5, 2.1);
+  const hasRealLight = isQuest ? index === 1 || index === 4 : index % 2 === 0;
+  if (hasRealLight) {
+    const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 6 : 8, 8.5, 2.2);
     light.position.copy(sprite.position);
     root.add(light);
   }
@@ -417,9 +418,6 @@ function addVendingMachine(root, materials, side, z, color) {
   }
   addBox(body, materials.blackMetal, [0.08, 0.28, 0.55], [-side * 0.48, -0.76, 0]);
   root.add(body);
-  const light = new THREE.PointLight(color, 8, 4.5, 2);
-  light.position.set(x - side * 0.8, 1.55, z);
-  root.add(light);
 }
 
 function addSideAlleys(root, materials) {
@@ -440,9 +438,6 @@ function addSideAlleys(root, materials) {
     addBox(root, materials.paintedMetal, [1.05, 2.0, 1.1], [side * 24.8, 1.1, side > 0 ? 1.3 : -1.2]);
     addBox(root, materials.blackMetal, [0.65, 0.85, 1.2], [side * 21.8, 0.55, side > 0 ? -1.15 : 1.1]);
     addBox(root, side < 0 ? amber : cyan, [0.08, 0.11, 2.7], [side * 26.72, 3.4, 0]);
-    const light = new THREE.PointLight(side < 0 ? 0xff9d55 : 0x55b6b0, 17, 10, 2);
-    light.position.set(side * 24.5, 3.3, 0);
-    root.add(light);
   }
 }
 
@@ -554,7 +549,7 @@ function addDistantCity(root, materials) {
   skyline.name = 'FOGGED_DISTANT_CITY';
   root.add(skyline);
 
-  const windowMaterial = new THREE.MeshBasicMaterial({ color: 0xc49360, transparent: true, opacity: 0.26, toneMapped: false });
+  const windowMaterial = new THREE.MeshBasicMaterial({ color: 0x594838, toneMapped: false });
   const windowGeometry = new THREE.BoxGeometry(0.12, 0.12, 2.0);
   for (let index = 0; index < 28; index += 1) {
     const light = new THREE.Mesh(windowGeometry, windowMaterial);
@@ -571,7 +566,7 @@ export function createCyberCity({ scene, renderer, isQuest = false }) {
   const animated = [];
   const colliders = [];
   const slotGroups = new Map();
-  const materials = createMaterialLibrary(renderer);
+  const materials = createMaterialLibrary(renderer, { isQuest });
 
   addSky(scene);
   addLighting(scene, isQuest);
@@ -586,8 +581,13 @@ export function createCyberCity({ scene, renderer, isQuest = false }) {
   addOverheadCables(root, materials);
   addFarTransit(root, materials, renderer);
   addDistantCity(root, materials);
+  batchStaticMeshes(
+    root,
+    [UNIT_BOX, UNIT_CYLINDER_8, UNIT_CYLINDER_16, UNIT_CYLINDER_32, UNIT_PLANE, UNIT_CIRCLE_14, UNIT_CIRCLE_20],
+    { prefix: 'district__batch' },
+  );
 
-  const factory = new BuildingFactory({ renderer, animated, materials });
+  const factory = new BuildingFactory({ renderer, animated, materials, isQuest });
   BUILDING_SLOTS.forEach((definition) => {
     const building = factory.create(definition);
     root.add(building);

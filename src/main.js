@@ -18,8 +18,8 @@ const captureMode = new URLSearchParams(window.location.search).get('capture');
 
 const isQuest = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x050708);
-scene.fog = new THREE.FogExp2(0x151c1e, isQuest ? 0.017 : 0.014);
+scene.background = new THREE.Color(0x07090a);
+scene.fog = new THREE.FogExp2(0x182123, isQuest ? 0.015 : 0.0125);
 
 const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.06, 340);
 camera.position.set(0, 1.68, 0);
@@ -32,22 +32,22 @@ playerRig.add(camera);
 scene.add(playerRig);
 
 const renderer = new THREE.WebGLRenderer({
-  antialias: true,
+  antialias: !isQuest,
   alpha: false,
   powerPreference: 'high-performance',
   depth: true,
   stencil: false,
 });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, isQuest ? 1.28 : 1.65));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isQuest ? 1 : 1.35));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = isQuest ? 1.12 : 1.16;
-renderer.shadowMap.enabled = true;
+renderer.toneMappingExposure = isQuest ? 1.22 : 1.25;
+renderer.shadowMap.enabled = !isQuest;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType('local-floor');
-renderer.xr.setFramebufferScaleFactor(isQuest ? 1.08 : 1.15);
+renderer.xr.setFramebufferScaleFactor(isQuest ? 0.9 : 1.05);
 viewport.appendChild(renderer.domElement);
 
 if (captureMode) {
@@ -121,7 +121,7 @@ soundButton.addEventListener('click', async () => {
 renderer.xr.addEventListener('sessionstart', () => {
   intro.classList.add('is-hidden');
   document.querySelector('#vignette').style.display = 'none';
-  if (renderer.xr.setFoveation) renderer.xr.setFoveation(0.65);
+  if (renderer.xr.setFoveation) renderer.xr.setFoveation(1);
 });
 
 renderer.xr.addEventListener('sessionend', () => {
@@ -133,7 +133,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isQuest ? 1.28 : 1.65));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isQuest ? 1 : 1.35));
 });
 
 renderer.domElement.addEventListener('webglcontextlost', (event) => {

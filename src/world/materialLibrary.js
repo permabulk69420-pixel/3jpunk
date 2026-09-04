@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 
 const TEXTURES = {
+  facadeMixed: {
+    color: new URL('../assets/materials/facade-mixed-use.webp', import.meta.url).href,
+  },
+  facadeIndustrial: {
+    color: new URL('../assets/materials/facade-industrial.webp', import.meta.url).href,
+  },
   asphalt: {
     color: new URL('../assets/materials/asphalt-albedo.webp', import.meta.url).href,
     height: new URL('../assets/materials/asphalt-height.webp', import.meta.url).href,
@@ -23,51 +29,63 @@ const TEXTURES = {
   },
 };
 
-function loadTexture(loader, renderer, url, repeat, colorTexture = false) {
+function loadTexture(loader, renderer, url, repeat, colorTexture = false, isQuest = false) {
   const texture = loader.load(url);
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(...repeat);
-  texture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  texture.anisotropy = Math.min(isQuest ? 4 : 8, renderer.capabilities.getMaxAnisotropy());
   texture.colorSpace = colorTexture ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   return texture;
 }
 
-function surfacePair(loader, renderer, key, repeat) {
+function surfacePair(loader, renderer, key, repeat, isQuest) {
   return {
-    map: loadTexture(loader, renderer, TEXTURES[key].color, repeat, true),
-    bumpMap: loadTexture(loader, renderer, TEXTURES[key].height, repeat, false),
+    map: loadTexture(loader, renderer, TEXTURES[key].color, repeat, true, isQuest),
+    bumpMap: loadTexture(loader, renderer, TEXTURES[key].height, repeat, false, isQuest),
   };
 }
 
-export function createMaterialLibrary(renderer) {
+export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const loader = new THREE.TextureLoader();
-  const asphalt = surfacePair(loader, renderer, 'asphalt', [2.2, 17]);
-  const sidewalk = surfacePair(loader, renderer, 'sidewalk', [1.5, 19]);
-  const concrete = surfacePair(loader, renderer, 'concrete', [2.2, 5.4]);
-  const brick = surfacePair(loader, renderer, 'brick', [2.7, 5.2]);
-  const shutter = surfacePair(loader, renderer, 'shutter', [1.2, 1.4]);
+  const asphalt = surfacePair(loader, renderer, 'asphalt', [2.2, 17], isQuest);
+  const sidewalk = surfacePair(loader, renderer, 'sidewalk', [1.5, 19], isQuest);
+  const concrete = surfacePair(loader, renderer, 'concrete', [2.2, 5.4], isQuest);
+  const brick = surfacePair(loader, renderer, 'brick', [2.7, 5.2], isQuest);
+  const shutter = surfacePair(loader, renderer, 'shutter', [1.2, 1.4], isQuest);
+  const facadeMixed = loadTexture(loader, renderer, TEXTURES.facadeMixed.color, [1, 1], true, isQuest);
+  const facadeIndustrial = loadTexture(loader, renderer, TEXTURES.facadeIndustrial.color, [1, 1], true, isQuest);
 
   const materials = {
-    road: new THREE.MeshPhysicalMaterial({
-      ...asphalt,
-      color: 0x72777b,
-      bumpScale: 0.075,
-      roughness: 0.31,
-      metalness: 0.04,
-      clearcoat: 1,
-      clearcoatRoughness: 0.12,
-      envMapIntensity: 1.55,
+    facadeMixed: new THREE.MeshStandardMaterial({
+      map: facadeMixed,
+      color: 0xd7d4cd,
+      roughness: 0.68,
+      metalness: 0.08,
+      envMapIntensity: 0.72,
     }),
-    sidewalk: new THREE.MeshPhysicalMaterial({
+    facadeIndustrial: new THREE.MeshStandardMaterial({
+      map: facadeIndustrial,
+      color: 0xd1d5d2,
+      roughness: 0.64,
+      metalness: 0.12,
+      envMapIntensity: 0.78,
+    }),
+    road: new THREE.MeshStandardMaterial({
+      ...asphalt,
+      color: 0x6b7072,
+      bumpScale: 0.06,
+      roughness: 0.25,
+      metalness: 0.14,
+      envMapIntensity: 1.35,
+    }),
+    sidewalk: new THREE.MeshStandardMaterial({
       ...sidewalk,
       color: 0x767976,
       bumpScale: 0.085,
-      roughness: 0.48,
+      roughness: 0.52,
       metalness: 0.03,
-      clearcoat: 0.52,
-      clearcoatRoughness: 0.22,
-      envMapIntensity: 1.15,
+      envMapIntensity: 0.9,
     }),
     concrete: new THREE.MeshStandardMaterial({
       ...concrete,
@@ -125,39 +143,29 @@ export function createMaterialLibrary(renderer) {
       roughness: 0.5,
       metalness: 0.05,
     }),
-    glass: new THREE.MeshPhysicalMaterial({
-      color: 0x182729,
-      roughness: 0.13,
-      metalness: 0.12,
-      transmission: 0.2,
-      thickness: 0.08,
-      transparent: true,
-      opacity: 0.72,
-      clearcoat: 1,
-      clearcoatRoughness: 0.08,
-      envMapIntensity: 1.8,
-    }),
-    darkGlass: new THREE.MeshPhysicalMaterial({
-      color: 0x071013,
+    glass: new THREE.MeshStandardMaterial({
+      color: 0x26383a,
       roughness: 0.2,
-      metalness: 0.38,
-      transparent: true,
-      opacity: 0.88,
-      clearcoat: 0.75,
-      clearcoatRoughness: 0.16,
-      envMapIntensity: 1.4,
+      metalness: 0.46,
+      envMapIntensity: 1.35,
+    }),
+    darkGlass: new THREE.MeshStandardMaterial({
+      color: 0x0d1719,
+      roughness: 0.24,
+      metalness: 0.52,
+      envMapIntensity: 1.2,
     }),
     warmWindow: new THREE.MeshStandardMaterial({
       color: 0x3f2f24,
       emissive: 0xffb266,
-      emissiveIntensity: 1.65,
+      emissiveIntensity: 0.82,
       roughness: 0.28,
       metalness: 0.05,
     }),
     coolWindow: new THREE.MeshStandardMaterial({
       color: 0x17272a,
       emissive: 0x8dc5bd,
-      emissiveIntensity: 0.62,
+      emissiveIntensity: 0.34,
       roughness: 0.25,
       metalness: 0.08,
     }),

@@ -13,7 +13,7 @@ export class AtmosphereSystem {
     this.focus = focus;
     this.isQuest = isQuest;
     this.random = seededRandom(7331);
-    this.dropCount = isQuest ? 720 : 1250;
+    this.dropCount = isQuest ? 280 : 620;
     this.dropState = new Float32Array(this.dropCount * 4);
     this.rippleState = [];
     this.#createRain();
@@ -69,7 +69,7 @@ export class AtmosphereSystem {
       toneMapped: false,
     });
     const geometry = new THREE.PlaneGeometry(1, 1);
-    this.rippleCount = this.isQuest ? 24 : 42;
+    this.rippleCount = this.isQuest ? 12 : 24;
     this.ripples = new THREE.InstancedMesh(geometry, material, this.rippleCount);
     this.ripples.name = 'RAIN_RIPPLES';
     this.ripples.frustumCulled = false;
@@ -93,7 +93,7 @@ export class AtmosphereSystem {
       [0.68, 'rgba(100,145,160,.07)'],
       [1, 'rgba(0,0,0,0)'],
     ]);
-    const count = this.isQuest ? 22 : 34;
+    const count = this.isQuest ? 12 : 22;
     const positions = new Float32Array(count * 3);
     const phases = new Float32Array(count);
     const sources = [

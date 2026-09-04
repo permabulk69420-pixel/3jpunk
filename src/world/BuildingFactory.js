@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createRadialTexture, seededRandom } from './proceduralTextures.js';
+import { batchStaticMeshes } from './batchStaticMeshes.js';
 
 const _matrix = new THREE.Matrix4();
 const _position = new THREE.Vector3();
@@ -157,10 +158,11 @@ function makePosterTexture(seed, accent) {
 }
 
 export class BuildingFactory {
-  constructor({ renderer, animated, materials }) {
+  constructor({ renderer, animated, materials, isQuest = false }) {
     this.renderer = renderer;
     this.animated = animated;
     this.materials = materials;
+    this.isQuest = isQuest;
     this.boxGeometry = new THREE.BoxGeometry(1, 1, 1);
     this.cylinder8 = new THREE.CylinderGeometry(1, 1, 1, 8);
     this.cylinder12 = new THREE.CylinderGeometry(1, 1, 1, 12);
@@ -198,6 +200,11 @@ export class BuildingFactory {
     this.#createInfrastructure(group, definition, random);
     this.#createSigns(group, definition);
     this.#createRoof(group, definition, wallMaterial, random);
+    batchStaticMeshes(
+      group,
+      [this.boxGeometry, this.cylinder8, this.cylinder12, this.cylinder20, this.torus],
+      { prefix: `${definition.id}__batch`, recursive: false },
+    );
 
     const anchor = new THREE.Object3D();
     anchor.name = `GLB_ANCHOR__${definition.id}`;
@@ -274,22 +281,21 @@ export class BuildingFactory {
     const accentMaterial = new THREE.MeshStandardMaterial({
       color: accent.clone().multiplyScalar(0.58),
       emissive: accent,
-      emissiveIntensity: 1.35,
+      emissiveIntensity: 0.72,
       roughness: 0.36,
       metalness: 0.25,
     });
     const warmInterior = new THREE.MeshStandardMaterial({
-      color: 0x392719,
-      emissive: 0xffa75c,
-      emissiveIntensity: 1.25,
-      roughness: 0.64,
+      color: 0x765238,
+      roughness: 0.68,
+      metalness: 0.02,
     });
     const coolInterior = new THREE.MeshStandardMaterial({
-      color: 0x172526,
-      emissive: definition.accent,
-      emissiveIntensity: 0.48,
-      roughness: 0.58,
+      color: 0x294144,
+      roughness: 0.62,
+      metalness: 0.04,
     });
+    const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x171718, roughness: 0.55, metalness: 0.35 });
 
     for (let index = 0; index < bayCount; index += 1) {
       const z = -depth / 2 + 0.85 + baySpan / 2 + index * baySpan;
@@ -324,7 +330,6 @@ export class BuildingFactory {
         mullions.push({ size: [0.23, 0.09, frameDepth - 0.4], position: [facadeX + direction * 0.31, 1.12, z] });
         addInstancedBoxes(group, this.boxGeometry, this.materials.blackMetal, mullions, `${definition.id}__shop-${index}-frames`);
 
-        const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x171718, roughness: 0.55, metalness: 0.35 });
         for (let shelf = 0; shelf < 3; shelf += 1) {
           addBox(
             group,
@@ -361,14 +366,16 @@ export class BuildingFactory {
           [0.12, 0.16, frameDepth + 0.28],
           [facadeX + direction * 1.72, 4.22, z],
         );
-        const tube = addBox(
-          group,
-          this.boxGeometry,
-          accentMaterial,
-          [0.065, 0.065, frameDepth * 0.58],
-          [facadeX + direction * 0.82, 4.08, z],
-        );
-        tube.name = `${definition.id}__shop-light`;
+        if (!closed && (type === 'eatery' || type === 'pharmacy' || index === 3)) {
+          const tube = addBox(
+            group,
+            this.boxGeometry,
+            accentMaterial,
+            [0.065, 0.065, frameDepth * 0.58],
+            [facadeX + direction * 0.82, 4.08, z],
+          );
+          tube.name = `${definition.id}__shop-light`;
+        }
       }
 
       if ((index + definition.seed) % 3 === 0) {
@@ -385,69 +392,35 @@ export class BuildingFactory {
         group.add(poster);
       }
 
-      if (!closed && index % 3 === 0) {
-        const light = new THREE.PointLight(type === 'eatery' ? 0xff9b55 : definition.accent, 18, 7.5, 2.1);
-        light.position.set(facadeX + direction * 1.0, 3.5, z);
-        group.add(light);
-      }
     }
   }
 
   #createUpperFacade(group, definition, random) {
     const [width, height, depth] = definition.size;
     const direction = -definition.side;
-    const facadeX = direction * (width / 2 + 0.12);
-    const floorHeight = 3.15;
-    const floors = Math.max(5, Math.floor((height - 6.1) / floorHeight));
-    const columns = 10;
-    const columnSpan = (depth - 4) / columns;
-    const recesses = [];
-    const darkWindows = [];
-    const warmWindows = [];
-    const coolWindows = [];
-    const frames = [];
-    const sills = [];
-    const drips = [];
+    const facadeX = direction * (width / 2 + 0.13);
+    const facadeHeight = Math.min(height - 0.5, 28);
+    const atlasKey = definition.facadeAtlas || (definition.material === 'brick' ? 'facadeMixed' : 'facadeIndustrial');
+    const facadeMaterial = this.materials[atlasKey].clone();
+    facadeMaterial.color.offsetHSL((random() - 0.5) * 0.012, -0.015, (random() - 0.5) * 0.035);
+    facadeMaterial.name = `${definition.id}__facade-atlas`;
 
-    for (let floor = 0; floor < floors; floor += 1) {
-      const y = 6.75 + floor * floorHeight;
-      for (let column = 0; column < columns; column += 1) {
-        if ((column + floor * 3 + definition.seed) % 17 === 0) continue;
-        const z = -depth / 2 + 2 + columnSpan / 2 + column * columnSpan;
-        recesses.push({ size: [0.24, 2.08, 1.82], position: [facadeX, y, z] });
-        const window = { size: [0.26, 1.48, 1.24], position: [facadeX + direction * 0.16, y, z] };
-        const lightRoll = random();
-        if (lightRoll > 0.8) warmWindows.push(window);
-        else if (lightRoll > 0.66) coolWindows.push(window);
-        else darkWindows.push(window);
-        frames.push({ size: [0.3, 1.5, 0.055], position: [facadeX + direction * 0.26, y, z] });
-        sills.push({ size: [0.54, 0.12, 1.72], position: [facadeX + direction * 0.17, y - 1.1, z] });
-        if (lightRoll < 0.35 && floor > 0) {
-          drips.push({
-            size: [0.035, 0.65 + random() * 1.35, 0.12 + random() * 0.18],
-            position: [facadeX + direction * 0.3, y - 1.45 - random() * 0.5, z + (random() - 0.5) * 0.7],
-          });
-        }
-      }
-    }
+    const facade = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), facadeMaterial);
+    facade.name = `${definition.id}__facade-detail`;
+    facade.position.set(facadeX, facadeHeight * 0.5, 0);
+    facade.rotation.y = direction * Math.PI / 2;
+    facade.scale.set(depth - 0.7, facadeHeight, 1);
+    facade.receiveShadow = true;
+    group.add(facade);
 
-    addInstancedBoxes(group, this.boxGeometry, this.materials.blackMetal, recesses, `${definition.id}__window-recesses`);
-    addInstancedBoxes(group, this.boxGeometry, this.materials.darkGlass, darkWindows, `${definition.id}__dark-windows`);
-    addInstancedBoxes(group, this.boxGeometry, this.materials.warmWindow, warmWindows, `${definition.id}__warm-windows`);
-    addInstancedBoxes(group, this.boxGeometry, this.materials.coolWindow, coolWindows, `${definition.id}__cool-windows`);
-    addInstancedBoxes(group, this.boxGeometry, this.materials.blackMetal, frames, `${definition.id}__window-mullions`);
-    addInstancedBoxes(group, this.boxGeometry, this.materials.paintedMetal, sills, `${definition.id}__window-sills`);
-    const dripMaterial = new THREE.MeshBasicMaterial({ color: 0x111514, transparent: true, opacity: 0.35 });
-    addInstancedBoxes(group, this.boxGeometry, dripMaterial, drips, `${definition.id}__rain-streak-depth`);
-
-    const floorBands = [];
-    for (let floor = 1; floor < floors; floor += 2) {
-      floorBands.push({
-        size: [0.26, 0.12, depth - 1],
-        position: [facadeX + direction * 0.02, 5.18 + floor * floorHeight, 0],
-      });
-    }
-    addInstancedBoxes(group, this.boxGeometry, this.materials.metal, floorBands, `${definition.id}__floor-bands`);
+    const ledges = [0.255, 0.5, 0.745]
+      .map((ratio) => ratio * facadeHeight)
+      .filter((y) => y > 5.5 && y < facadeHeight - 1.2)
+      .map((y) => ({
+        size: [0.24, 0.1, depth - 0.9],
+        position: [facadeX + direction * 0.08, y, 0],
+      }));
+    addInstancedBoxes(group, this.boxGeometry, this.materials.paintedMetal, ledges, `${definition.id}__facade-ledges`);
   }
 
   #createBalconies(group, definition, random) {
