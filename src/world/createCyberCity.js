@@ -301,7 +301,7 @@ function addLamp(root, materials, side, z, index, glowTexture, isQuest) {
   sprite.position.set(x - side * 1.58, 4.83, z);
   sprite.scale.set(2.1, 2.1, 1);
   root.add(sprite);
-  const hasRealLight = isQuest ? [1, 4, 5].includes(index) : index % 2 === 0 || index === 5;
+  const hasRealLight = isQuest ? [1, 4].includes(index) : index % 2 === 0;
   if (hasRealLight) {
     const light = new THREE.PointLight(lampColor, index % 4 === 3 ? 14 : 20, 9.5, 2.2);
     light.position.copy(sprite.position);
@@ -418,6 +418,40 @@ function addSkybridge(root, materials) {
   root.add(bridge);
 }
 
+function addHeroBillboard(root, materials) {
+  const billboard = new THREE.Group();
+  billboard.name = 'WARDWATCH_HERO_BILLBOARD';
+
+  const centerX = 3.3;
+  const centerY = 10.1;
+  const centerZ = -3.9;
+
+  addBox(billboard, materials.blackMetal, [8.85, 5.25, 0.24], [centerX, centerY, centerZ], {
+    castShadow: true,
+    name: 'WARDWATCH_FRAME',
+  });
+
+  const screen = new THREE.Mesh(new THREE.PlaneGeometry(8.3, 4.7), materials.wardwatchScreen);
+  screen.name = 'WARDWATCH_SCREEN';
+  screen.position.set(centerX, centerY, centerZ + 0.125);
+  screen.receiveShadow = false;
+  screen.userData.noBatch = true;
+  billboard.add(screen);
+
+  const frameZ = centerZ + 0.16;
+  addBox(billboard, materials.metal, [8.72, 0.12, 0.13], [centerX, centerY + 2.48, frameZ]);
+  addBox(billboard, materials.metal, [8.72, 0.12, 0.13], [centerX, centerY - 2.48, frameZ]);
+  addBox(billboard, materials.metal, [0.12, 4.9, 0.13], [centerX - 4.3, centerY, frameZ]);
+  addBox(billboard, materials.metal, [0.12, 4.9, 0.13], [centerX + 4.3, centerY, frameZ]);
+
+  for (const y of [centerY - 1.72, centerY + 1.72]) {
+    addBox(billboard, materials.blackMetal, [4.25, 0.16, 0.16], [9.65, y, centerZ - 0.05]);
+    addBox(billboard, materials.paintedMetal, [0.22, 0.58, 0.52], [11.68, y, centerZ - 0.05]);
+  }
+
+  root.add(billboard);
+}
+
 function addOverheadCables(root, materials) {
   const cableMaterial = materials.rubber;
   const crossStreet = [
@@ -530,6 +564,7 @@ export function createCyberCity({ scene, renderer, isQuest = false }) {
   addVendingMachine(root, materials, 1, 3.7, 0xc26a49);
   addVendingMachine(root, materials, -1, -21.5, 0xa84c63);
   addSideAlleys(root, materials);
+  addHeroBillboard(root, materials);
   addSkybridge(root, materials);
   addOverheadCables(root, materials);
   addFarTransit(root, materials, renderer);

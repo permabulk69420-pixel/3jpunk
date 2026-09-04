@@ -7,6 +7,9 @@ const TEXTURES = {
   facadeIndustrial: {
     color: new URL('../assets/materials/facade-industrial.webp', import.meta.url).href,
   },
+  wardwatch: {
+    color: new URL('../assets/materials/wardwatch-billboard.webp', import.meta.url).href,
+  },
   asphalt: {
     color: new URL('../assets/materials/asphalt-albedo.webp', import.meta.url).href,
     height: new URL('../assets/materials/asphalt-height.webp', import.meta.url).href,
@@ -55,8 +58,20 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const shutter = surfacePair(loader, renderer, 'shutter', [1.2, 1.4], isQuest);
   const facadeMixed = loadTexture(loader, renderer, TEXTURES.facadeMixed.color, [1, 1], true, isQuest);
   const facadeIndustrial = loadTexture(loader, renderer, TEXTURES.facadeIndustrial.color, [1, 1], true, isQuest);
+  const wardwatch = loadTexture(loader, renderer, TEXTURES.wardwatch.color, [1, 1], true, isQuest);
+  wardwatch.wrapS = THREE.ClampToEdgeWrapping;
+  wardwatch.wrapT = THREE.ClampToEdgeWrapping;
 
   const materials = {
+    wardwatchScreen: new THREE.MeshStandardMaterial({
+      map: wardwatch,
+      emissiveMap: wardwatch,
+      emissive: 0xffffff,
+      emissiveIntensity: 0.78,
+      roughness: 0.28,
+      metalness: 0.06,
+      envMapIntensity: 0.45,
+    }),
     facadeMixed: new THREE.MeshStandardMaterial({
       map: facadeMixed,
       color: 0xffffff,

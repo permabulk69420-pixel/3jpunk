@@ -27,7 +27,7 @@ camera.rotation.x = 0.035;
 
 const playerRig = new THREE.Group();
 playerRig.name = 'PLAYER_RIG';
-playerRig.position.set(0, 0, 43.5);
+playerRig.position.set(0, 0, 48.5);
 playerRig.add(camera);
 scene.add(playerRig);
 
@@ -53,7 +53,7 @@ viewport.appendChild(renderer.domElement);
 if (captureMode) {
   document.body.classList.add('is-capture');
   const captureViews = {
-    street: { position: [1.2, 0, 43.5], yaw: 0.035, pitch: 0.045 },
+    street: { position: [0.8, 0, 48.5], yaw: 0.025, pitch: 0.055 },
     bridge: { position: [-3.8, 0, 21], yaw: -0.17, pitch: 0.08 },
     alley: { position: [1.6, 0, 8.5], yaw: 0.72, pitch: 0.025 },
   };
