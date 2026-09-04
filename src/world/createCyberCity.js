@@ -342,15 +342,15 @@ function addStreetFurniture(root, materials, isQuest) {
   ];
   propData.forEach(([x, z, type], index) => {
     const side = Math.sign(x);
-    const frontX = x - side;
     if (type === 'bin') {
       addBox(root, materials.paintedMetal, [0.92, 1.18, 1.04], [x, 0.75, z], { castShadow: true });
       addBox(root, materials.blackMetal, [1.04, 0.15, 1.16], [x, 1.4, z], {
         rotation: [0, 0, side * (index % 2 ? 0.045 : -0.035)],
       });
-      addBox(root, materials.blackMetal, [0.055, 0.22, 0.62], [frontX + side * 0.505, 1.08, z]);
+      addStreetFacingPanel(root, materials.municipalService, [0.72, 0.78], [x - side * 0.492, 0.82, z], side, 'SMART_WASTE_SERVICE_PANEL');
+      addBox(root, materials.blackMetal, [0.055, 0.22, 0.62], [x - side * 0.528, 1.08, z]);
       for (const railZ of [-0.37, 0.37]) {
-        addBox(root, materials.metal, [0.06, 0.48, 0.055], [frontX + side * 0.49, 1.03, z + railZ]);
+        addBox(root, materials.metal, [0.06, 0.48, 0.055], [x - side * 0.51, 1.03, z + railZ]);
         addBox(root, materials.blackMetal, [0.08, 0.08, 0.19], [x, 1.31, z + railZ]);
       }
       addBox(root, materials.blackMetal, [1.0, 0.1, 1.1], [x, 0.2, z]);
@@ -373,6 +373,7 @@ function addStreetFurniture(root, materials, isQuest) {
       addBox(root, materials.paintedMetal, [0.84, 0.1, 1.22], [x, 0.86, z]);
       const caseFrontX = x - side * 0.415;
       addBox(root, materials.paintedMetal, [0.055, 0.56, 1.02], [caseFrontX, 0.49, z]);
+      addStreetFacingPanel(root, materials.cargoCase, [0.9, 0.48], [x - side * 0.452, 0.49, z], side, 'CARGO_CASE_FRONT');
       for (const railZ of [-0.5, 0.5]) {
         addBox(root, materials.blackMetal, [0.07, 0.62, 0.075], [caseFrontX - side * 0.015, 0.5, z + railZ]);
       }
@@ -448,11 +449,12 @@ function addSideAlleys(root, materials) {
 
     addBox(root, materials.blackMetal, [0.7, 0.86, 1.2], [caseX, 0.55, caseZ]);
     addBox(root, materials.paintedMetal, [0.76, 0.1, 1.28], [caseX, 1.02, caseZ]);
+    addStreetFacingPanel(root, materials.cargoCase, [1.0, 0.58], [caseX - side * 0.365, 0.57, caseZ], side, 'ALLEY_CARGO_CASE_FRONT');
     for (const railZ of [-0.51, 0.51]) {
       addBox(root, materials.metal, [0.76, 0.75, 0.07], [caseX, 0.57, caseZ + railZ]);
     }
     for (const railY of [0.34, 0.76]) {
-      addBox(root, materials.metal, [0.76, 0.06, 1.08], [caseX, railY, caseZ]);
+      addBox(root, materials.metal, [0.06, 0.06, 1.08], [caseX - side * 0.405, railY, caseZ]);
     }
     addBox(root, side < 0 ? amber : cyan, [0.08, 0.11, 2.7], [side * 26.72, 3.4, 0]);
   }

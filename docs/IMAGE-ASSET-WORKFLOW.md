@@ -151,3 +151,13 @@ The screenshots are not a headset frame-rate benchmark, but they catch bad UVs, 
 | `nami-eatery` | weathered industrial tenement | fire escape, horizontal roof vessels, drying frames |
 | `kuroda-works` | brick-and-steel repair works | heavy ribs, exhaust stacks, sawtooth plant roof |
 | `echo-capsules` | pale modular capsule hotel | module rails, stepped mechanical crown, antenna array |
+
+## Current prop roles
+
+| Asset | Runtime role | Emission rule |
+| --- | --- | --- |
+| `vending-drinks-front.webp` | drink-and-packet vending face | albedo only; separate status LED emits |
+| `vending-essentials-front.webp` | food-and-essentials vending face | albedo only; separate status LED emits |
+| `municipal-service-front.webp` | utility cabinets and smart-waste access panels | albedo only; separate tiny cabinet indicator emits |
+| `cargo-case-front.webp` | reusable freight-case faces | entirely non-emissive |
+| `poster-*.webp` | four shared street-print designs | entirely non-emissive |

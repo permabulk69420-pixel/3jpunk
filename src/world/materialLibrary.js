@@ -25,6 +25,9 @@ const TEXTURES = {
   municipalService: {
     color: new URL('../assets/materials/municipal-service-front.webp', import.meta.url).href,
   },
+  cargoCase: {
+    color: new URL('../assets/materials/cargo-case-front.webp', import.meta.url).href,
+  },
   posterTransit: {
     color: new URL('../assets/materials/poster-transit.webp', import.meta.url).href,
   },
@@ -102,6 +105,7 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
   const vendingDrinks = loadClampedTexture(loader, renderer, TEXTURES.vendingDrinks.color, true, isQuest);
   const vendingEssentials = loadClampedTexture(loader, renderer, TEXTURES.vendingEssentials.color, true, isQuest);
   const municipalService = loadClampedTexture(loader, renderer, TEXTURES.municipalService.color, true, isQuest);
+  const cargoCase = loadClampedTexture(loader, renderer, TEXTURES.cargoCase.color, true, isQuest);
   const posterTransit = loadClampedTexture(loader, renderer, TEXTURES.posterTransit.color, true, isQuest);
   const posterMaintenance = loadClampedTexture(loader, renderer, TEXTURES.posterMaintenance.color, true, isQuest);
   const posterProvisions = loadClampedTexture(loader, renderer, TEXTURES.posterProvisions.color, true, isQuest);
@@ -128,6 +132,13 @@ export function createMaterialLibrary(renderer, { isQuest = false } = {}) {
       roughness: 0.57,
       metalness: 0.42,
       envMapIntensity: 0.92,
+    }),
+    cargoCase: new THREE.MeshStandardMaterial({
+      map: cargoCase,
+      color: 0xffffff,
+      roughness: 0.58,
+      metalness: 0.32,
+      envMapIntensity: 0.82,
     }),
     posterTransit: new THREE.MeshStandardMaterial({
       map: posterTransit,
